@@ -4,16 +4,20 @@ import Moment from "moment";
 import {
   Button,
   Col,
-  Icon,
   Input,
   Modal,
   notification,
   Row,
   Select,
   Table,
-  Tag
 } from "antd";
-import { Aux, prepareCellEntries, prepareTableData } from "./Utils";
+import {
+  Aux,
+  prepareSpecialistByProduct,
+  prepareTableColumns,
+  prepareTableData,
+  prepareTableDataWithEvents
+} from "./PrepareFunctions";
 
 const Option = Select.Option;
 
@@ -53,7 +57,7 @@ class App extends Component {
       ) {
         leadId = info.options.ID;
       }
-      const tableColumns = this.prepareTableColumns(
+      const tableColumns = prepareTableColumns(
         this.state.startDate,
         this.state.currentDate
       );
@@ -158,194 +162,6 @@ class App extends Component {
   };
 
   /**
-   * @param {string} current
-   * @param {string} start
-   * готовит заголовок таблицы
-   */
-  prepareTableColumns = (start, current) => {
-    let result = [];
-    result.push({
-      title: <Icon type="clock-circle-o" />,
-      dataIndex: "time",
-      key: "time",
-      className: "app-table-class-name"
-    });
-    for (let i = 0; i < 7; i++) {
-      const dt = Moment(start).add(i, "days");
-      const dayName = Moment(dt).format("ddd");
-      const title =
-        Moment(dt).format("YYYY-MM-DD") === current ? (
-          <div>
-            {dayName + ", "} <Tag color="#108ee9">{Moment(dt).format("D")}</Tag>
-          </div>
-        ) : (
-          dayName + ", " + Moment(dt).format("D")
-        );
-      result.push({
-        title: title,
-        dataIndex: dayName,
-        key: dayName,
-        className: "app-table-class-name"
-      });
-    }
-    return result;
-  };
-
-  /**
-   * @param {Array} events
-   * заполняем строки таблицы событиями
-   */
-  prepareTableDataWithEvents = events => {
-    let result = [];
-    const start_hour = 8;
-    let i = 0;
-    this.state.tableData.forEach(row => {
-      let newRow = {
-        key: row.key,
-        time: row.time
-      };
-      const hour_from = start_hour + i;
-      let rowTime = (hour_from < 10 ? "0" + hour_from : hour_from) + ":00:00";
-      Object.keys(row).forEach(cell => {
-        switch (cell) {
-          case "пн": {
-            const cellStartDate = Moment(
-              Moment(this.state.startDate)
-                .startOf("week")
-                .format("YYYY-MM-DD") +
-                " " +
-                rowTime
-            );
-            newRow[cell] = prepareCellEntries(
-              cellStartDate,
-              events,
-              this.handleShowModal
-            );
-            break;
-          }
-          case "вт": {
-            const cellStartDate = Moment(
-              Moment(this.state.startDate)
-                .startOf("week")
-                .add(1, "days")
-                .format("YYYY-MM-DD") +
-                " " +
-                rowTime
-            );
-            newRow[cell] = prepareCellEntries(
-              cellStartDate,
-              events,
-              this.handleShowModal
-            );
-            break;
-          }
-          case "ср": {
-            const cellStartDate = Moment(
-              Moment(this.state.startDate)
-                .startOf("week")
-                .add(2, "days")
-                .format("YYYY-MM-DD") +
-                " " +
-                rowTime
-            );
-            newRow[cell] = prepareCellEntries(
-              cellStartDate,
-              events,
-              this.handleShowModal
-            );
-            break;
-          }
-          case "чт": {
-            const cellStartDate = Moment(
-              Moment(this.state.startDate)
-                .startOf("week")
-                .add(3, "days")
-                .format("YYYY-MM-DD") +
-                " " +
-                rowTime
-            );
-            newRow[cell] = prepareCellEntries(
-              cellStartDate,
-              events,
-              this.handleShowModal
-            );
-            break;
-          }
-          case "пт": {
-            const cellStartDate = Moment(
-              Moment(this.state.startDate)
-                .startOf("week")
-                .add(4, "days")
-                .format("YYYY-MM-DD") +
-                " " +
-                rowTime
-            );
-            newRow[cell] = prepareCellEntries(
-              cellStartDate,
-              events,
-              this.handleShowModal
-            );
-            break;
-          }
-          case "сб": {
-            const cellStartDate = Moment(
-              Moment(this.state.startDate)
-                .startOf("week")
-                .add(5, "days")
-                .format("YYYY-MM-DD") +
-                " " +
-                rowTime
-            );
-            newRow[cell] = prepareCellEntries(
-              cellStartDate,
-              events,
-              this.handleShowModal
-            );
-            break;
-          }
-          case "вс": {
-            const cellStartDate = Moment(
-              Moment(this.state.startDate)
-                .startOf("week")
-                .add(6, "days")
-                .format("YYYY-MM-DD") +
-                " " +
-                rowTime
-            );
-            newRow[cell] = prepareCellEntries(
-              cellStartDate,
-              events,
-              this.handleShowModal
-            );
-            break;
-          }
-          default:
-        }
-      });
-      result.push(newRow);
-      i++;
-    });
-    return result;
-  };
-
-  /**
-   * @param {Array} data
-   * получает массив id сотрудников и возвращает массив объектов с id и name сотрудника
-   */
-  prepareSpecialistByProduct = data => {
-    let result = [];
-    this.state.users.forEach(user => {
-      if (data.indexOf(user.id) !== -1) {
-        result.push({
-          ID: user.id,
-          NAME: user.lastName + " " + user.firstName
-        });
-      }
-    });
-    return result;
-  };
-
-  /**
    * @param {string} val
    * вызвается при выборе раздела товаров
    */
@@ -417,7 +233,10 @@ class App extends Component {
               if (specialists.length && duration) {
                 this.setState({
                   duration,
-                  specialists: this.prepareSpecialistByProduct(specialists)
+                  specialists: prepareSpecialistByProduct(
+                    this.state.users,
+                    specialists
+                  )
                 });
               } else if (!specialists.length && duration) {
                 notification.open({
@@ -433,7 +252,10 @@ class App extends Component {
                   description: "У услуги отсутсвует «Продолжительность»!"
                 });
                 this.setState({
-                  specialists: this.prepareSpecialistByProduct(specialists)
+                  specialists: prepareSpecialistByProduct(
+                    this.state.users,
+                    specialists
+                  )
                 });
               } else {
                 notification.open({
@@ -489,13 +311,51 @@ class App extends Component {
             description: "Ошибка получения календаря событий специалиста!"
           });
         } else {
-          const events = result.data();
-          if (events && events.length) {
-            const tableData = this.prepareTableDataWithEvents(events);
-            this.setState({ loading: false, events, tableData });
-          } else {
-            this.setState({ loading: false });
-          }
+          let events = result.data();
+          BX24.callMethod(
+            "crm.activity.list",
+            {
+              filter: {
+                OWNER_TYPE_ID: id,
+                ">=START_TIME": Moment(startDate).format(),
+                "<=END_TIME": Moment(endDate).format()
+              }
+            },
+            result => {
+              const deals = result.data();
+              let items = [];
+              if (events.length && deals.length) {
+                deals.forEach(deal => {
+                  events = events.filter(event => {
+                    return (
+                      !Moment(Moment.utc(deal.START_TIME)).isSame(
+                        Moment(event.DATE_FROM, "DD.MM.YYYY HH:mm:ss")
+                      ) &&
+                      !Moment(Moment.utc(deal.END_TIME)).isSame(
+                        Moment(event.DATE_TO, "DD.MM.YYYY HH:mm:ss")
+                      )
+                    );
+                  });
+                });
+                items = [...events, ...deals];
+              } else if (events.length && !deals.length) {
+                items = [...events];
+              } else if (!events.length && deals.length) {
+                items = [...deals];
+              }
+              if (items && items.length) {
+                const tableData = prepareTableDataWithEvents(                  
+                  this.handleShowModal,
+                  items,
+                  this.state.startDate,
+                  this.state.tableData
+                );
+                this.setState({ loading: false, events: items, tableData });
+              } else {
+                this.setState({ loading: false });
+              }              
+            }
+          );
         }
       }
     );
@@ -630,7 +490,7 @@ class App extends Component {
                     const newEndDate = Moment(endDate)
                       .subtract(1, "w")
                       .format("YYYY-MM-DD");
-                    const newTableColumns = this.prepareTableColumns(
+                    const newTableColumns = prepareTableColumns(
                       newStartDate,
                       currentDate
                     );
@@ -639,7 +499,11 @@ class App extends Component {
                       startDate: newStartDate,
                       tableColumns: newTableColumns
                     });
-                    this.handleSpecialistSelect(selectedSpecialistId, newStartDate, newEndDate);
+                    this.handleSpecialistSelect(
+                      selectedSpecialistId,
+                      newStartDate,
+                      newEndDate
+                    );
                   }}
                 />
                 {" " +
@@ -658,7 +522,7 @@ class App extends Component {
                     const newEndDate = Moment(endDate)
                       .add(1, "w")
                       .format("YYYY-MM-DD");
-                    const newTableColumns = this.prepareTableColumns(
+                    const newTableColumns = prepareTableColumns(
                       newStartDate,
                       currentDate
                     );
@@ -667,7 +531,11 @@ class App extends Component {
                       startDate: newStartDate,
                       tableColumns: newTableColumns
                     });
-                    this.handleSpecialistSelect(selectedSpecialistId, newStartDate, newEndDate);
+                    this.handleSpecialistSelect(
+                      selectedSpecialistId,
+                      newStartDate,
+                      newEndDate
+                    );
                   }}
                 />
               </Aux>

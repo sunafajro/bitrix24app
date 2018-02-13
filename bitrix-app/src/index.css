@@ -1,8 +1,40 @@
-.app-table-class-name {
-    /* padding: 2px !important; */
-    text-align: center !important;
+.ant-table-body > table {
+    min-height: 500px;
+    padding: 0 !important;
 }
 
-/* .app-event-class-name {
-    border: 1px solid #eee;
-} */
+.ant-table-thead > tr > th {
+    background-color: #eee; 
+}
+
+.app-table-class-name {
+    padding: 2px !important;
+    text-align: center !important;
+    vertical-align: top;
+}
+
+.app-addevent-class-name {
+    color: rgba(0,0,0,.65);
+    background-color: #fff;
+    border: 1px solid transparent;
+    border-color: #d9d9d9;
+    margin-bottom: 2px;
+    width: "100%";
+}
+
+.app-addevent-class-name:hover {
+    color: #40a9ff;
+    background-color: #fff;
+    border-color: #40a9ff;
+}
+
+.app-event-class-name {
+    border: 1px solid #ccc;
+    background-color: #dbfccd;
+    margin-bottom: 2px;
+    width: "100%";
+}
+
+.ant-table-tbody > .ant-table-row:hover > td {
+    background-color: #fff;
+}
