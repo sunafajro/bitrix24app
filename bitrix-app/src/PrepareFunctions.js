@@ -4,11 +4,11 @@ import { Icon, Tag } from "antd";
 
 export const Aux = props => props.children;
 
-const AddEventDiv = ({ handleShowModal }) => {
+const AddEventDiv = ({ handleShowModal, num }) => {
   return (
     <div
       className="app-addevent-class-name"
-      onClick={() => handleShowModal()}
+      onClick={() => handleShowModal(num)}
     >
       <Icon type="plus-circle-o" />
     </div>
@@ -30,7 +30,7 @@ export const prepareCellEntries = (cellDate, events, handleShowModal) => {
       <AddEventDiv handleShowModal={handleShowModal} />
       {dataEvents.length && (
         dataEvents.map(item => (
-          <div className="app-event-class-name" key={"user-event-" + item.ID}>
+          <div className="app-event-class-name" style={{ backgroundColor: item.COLOR }} key={"user-event-" + item.ID}>
             {`${item.DATE_FROM.substring(11, 16)} - ${item.DATE_TO.substring(11, 16)}`}
             <br />
             {item.NAME}
@@ -93,13 +93,13 @@ export const prepareTableData = handleShowModal => {
   let result = [];
   result.push({
     key: "table-row",
-    пн: <AddEventDiv handleShowModal={handleShowModal} />,
-    вт: <AddEventDiv handleShowModal={handleShowModal} />,
-    ср: <AddEventDiv handleShowModal={handleShowModal} />,
-    чт: <AddEventDiv handleShowModal={handleShowModal} />,
-    пт: <AddEventDiv handleShowModal={handleShowModal} />,
-    сб: <AddEventDiv handleShowModal={handleShowModal} />,
-    вс: <AddEventDiv handleShowModal={handleShowModal} />
+    пн: <AddEventDiv handleShowModal={handleShowModal} num={0} />,
+    вт: <AddEventDiv handleShowModal={handleShowModal} num={1} />,
+    ср: <AddEventDiv handleShowModal={handleShowModal} num={2} />,
+    чт: <AddEventDiv handleShowModal={handleShowModal} num={3} />,
+    пт: <AddEventDiv handleShowModal={handleShowModal} num={4} />,
+    сб: <AddEventDiv handleShowModal={handleShowModal} num={5} />,
+    вс: <AddEventDiv handleShowModal={handleShowModal} num={6} />
   });
   return result;
 };
@@ -222,6 +222,11 @@ export const sortAndFixItems = (data) => {
       item.DATE_FROM = Moment(dateFrom).format("DD.MM.YYYY HH:mm:ss");
       item.DATE_TO = Moment(dateTo).format("DD.MM.YYYY HH:mm:ss");
       item.NAME = item.SUBJECT;
+      /* дела заливаем светло-зеленым */
+      item.COLOR = "#dbfccd";
+    } else {
+      /* события без дел (отсуствие на работе) заливаем серым */
+      item.COLOR = "#eeeeee";
     }
   });
   data.sort((a, b) => {

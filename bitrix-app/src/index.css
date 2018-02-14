@@ -14,12 +14,10 @@
 }
 
 .app-addevent-class-name {
-    color: rgba(0,0,0,.65);
-    background-color: #fff;
     border: 1px solid transparent;
     border-color: #d9d9d9;
     margin-bottom: 2px;
-    width: "100%";
+    width: 100%;
 }
 
 .app-addevent-class-name:hover {
@@ -30,9 +28,8 @@
 
 .app-event-class-name {
     border: 1px solid #ccc;
-    background-color: #dbfccd;
     margin-bottom: 2px;
-    width: "100%";
+    width: 100%;
 }
 
 .ant-table-tbody > .ant-table-row:hover > td {

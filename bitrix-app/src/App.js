@@ -10,6 +10,7 @@ import {
   Row,
   Select,
   Table,
+  TimePicker
 } from "antd";
 import {
   Aux,
@@ -26,6 +27,7 @@ class App extends Component {
     currentDate: Moment().format("YYYY-MM-DD"),
     duration: "",
     events: [],
+    eventStartTime: Moment(),
     fetchServices: false,
     loading: false,
     products: [],
@@ -316,7 +318,8 @@ class App extends Component {
             "crm.activity.list",
             {
               filter: {
-                OWNER_TYPE_ID: id,
+                //OWNER_TYPE_ID
+                RESPONSIBLE_ID: id,
                 ">=START_TIME": Moment(startDate).format(),
                 "<=END_TIME": Moment(endDate).format()
               }
@@ -344,7 +347,7 @@ class App extends Component {
                 items = [...deals];
               }
               if (items && items.length) {
-                const tableData = prepareTableDataWithEvents(                  
+                const tableData = prepareTableDataWithEvents(
                   this.handleShowModal,
                   items,
                   this.state.startDate,
@@ -353,7 +356,7 @@ class App extends Component {
                 this.setState({ loading: false, events: items, tableData });
               } else {
                 this.setState({ loading: false });
-              }              
+              }
             }
           );
         }
@@ -361,8 +364,9 @@ class App extends Component {
     );
   };
 
-  handleShowModal = () => {
-    this.setState({ visible: true });
+  handleShowModal = (num) => {
+    const eventStartTime = Moment().startOf("week").add(num, 'days');
+    this.setState({ eventStartTime, visible: true });
   };
 
   render() {
@@ -370,6 +374,7 @@ class App extends Component {
       currentDate,
       duration,
       endDate,
+      eventStartTime,
       loading,
       products,
       sections,
@@ -382,11 +387,14 @@ class App extends Component {
       tableData,
       visible
     } = this.state;
+    const timeFormat = "HH:mm";
     const pagination = {
       hideOnSinglePage: true,
       pageSize: 12
     };
-
+    let productList = {};
+    let specialistList = {};
+    console.log(eventStartTime);
     let sectionOptions = [
       <Option key="select-section" value="-select-" disabled>
         -выберите категорию-
@@ -427,6 +435,7 @@ class App extends Component {
             {product.NAME}
           </Option>
         );
+        productList[product.ID] = product.NAME;
       });
     }
 
@@ -448,13 +457,14 @@ class App extends Component {
         -выберите специалиста-
       </Option>
     ];
-    if (products.length) {
+    if (specialists.length) {
       specialists.forEach(specialist => {
         specialistOptions.push(
           <Option key={"opt-" + specialist.ID} value={specialist.ID}>
             {specialist.NAME}
           </Option>
         );
+        specialistList[specialist.ID] = specialist.NAME;
       });
     }
 
@@ -558,7 +568,43 @@ class App extends Component {
           title="Добавить событие"
           visible={visible}
         >
-          <Input value={duration} />
+          <div style={{ marginBottom: "5px" }}>
+            <b>Время:</b>
+            <Row>
+              <Col span={8}>
+                <TimePicker
+                  format={timeFormat}
+                  onChange={time => this.setState({ eventStartTime: time })}
+                  value={Moment(eventStartTime)}
+                />
+              </Col>
+              <Col span={8}>
+                <Input disabled={true} value={duration} />
+              </Col>
+              <Col span={8} style={{ textAlign: "right" }}>
+                <TimePicker
+                  disabled={true}
+                  format={timeFormat}
+                  value={Moment(eventStartTime).add(duration, "minutes")}
+                />
+              </Col>
+            </Row>
+          </div>
+          <div style={{ marginBottom: "5px" }}>
+            <b>Услуга:</b>
+            <Input disabled={true} value={productList[selectedProductId]} />
+          </div>
+          <div style={{ marginBottom: "5px" }}>
+            <b>Специалист:</b>
+            <Input
+              disabled={true}
+              value={specialistList[selectedSpecialistId]}
+            />
+          </div>
+          <div style={{ marginBottom: "5px" }}>
+            <b>Клиент:</b>
+            <Input disabled={true} value={"кто то"} />
+          </div>
         </Modal>
       </div>
     );
