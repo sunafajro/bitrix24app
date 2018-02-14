@@ -364,9 +364,8 @@ class App extends Component {
     );
   };
 
-  handleShowModal = (num) => {
-    const eventStartTime = Moment().startOf("week").add(num, 'days');
-    this.setState({ eventStartTime, visible: true });
+  handleShowModal = (date) => {
+    this.setState({ eventStartTime: date, visible: true });
   };
 
   render() {
@@ -394,7 +393,6 @@ class App extends Component {
     };
     let productList = {};
     let specialistList = {};
-    console.log(eventStartTime);
     let sectionOptions = [
       <Option key="select-section" value="-select-" disabled>
         -выберите категорию-

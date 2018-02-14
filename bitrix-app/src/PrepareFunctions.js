@@ -4,11 +4,11 @@ import { Icon, Tag } from "antd";
 
 export const Aux = props => props.children;
 
-const AddEventDiv = ({ handleShowModal, num }) => {
+const AddEventDiv = ({ date, handleShowModal }) => {
   return (
     <div
       className="app-addevent-class-name"
-      onClick={() => handleShowModal(num)}
+      onClick={() => handleShowModal(date)}
     >
       <Icon type="plus-circle-o" />
     </div>
@@ -27,7 +27,7 @@ export const prepareCellEntries = (cellDate, events, handleShowModal) => {
   });
   return (
     <Aux>
-      <AddEventDiv handleShowModal={handleShowModal} />
+      <AddEventDiv date={Moment(cellDate)} handleShowModal={handleShowModal} />
       {dataEvents.length && (
         dataEvents.map(item => (
           <div className="app-event-class-name" style={{ backgroundColor: item.COLOR }} key={"user-event-" + item.ID}>
@@ -93,13 +93,13 @@ export const prepareTableData = handleShowModal => {
   let result = [];
   result.push({
     key: "table-row",
-    пн: <AddEventDiv handleShowModal={handleShowModal} num={0} />,
-    вт: <AddEventDiv handleShowModal={handleShowModal} num={1} />,
-    ср: <AddEventDiv handleShowModal={handleShowModal} num={2} />,
-    чт: <AddEventDiv handleShowModal={handleShowModal} num={3} />,
-    пт: <AddEventDiv handleShowModal={handleShowModal} num={4} />,
-    сб: <AddEventDiv handleShowModal={handleShowModal} num={5} />,
-    вс: <AddEventDiv handleShowModal={handleShowModal} num={6} />
+    пн: "", // <AddEventDiv handleShowModal={handleShowModal} num={0} />,
+    вт: "", // <AddEventDiv handleShowModal={handleShowModal} num={1} />,
+    ср: "", //<AddEventDiv handleShowModal={handleShowModal} num={2} />,
+    чт: "", //<AddEventDiv handleShowModal={handleShowModal} num={3} />,
+    пт: "", //<AddEventDiv handleShowModal={handleShowModal} num={4} />,
+    сб: "", // <AddEventDiv handleShowModal={handleShowModal} num={5} />,
+    вс: "" // <AddEventDiv handleShowModal={handleShowModal} num={6} />
   });
   return result;
 };
