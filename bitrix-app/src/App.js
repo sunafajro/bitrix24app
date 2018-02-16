@@ -24,12 +24,19 @@ const Option = Select.Option;
 
 class App extends Component {
   state = {
+    contactId: 0,
     currentDate: Moment().format("YYYY-MM-DD"),
     duration: "",
     events: [],
     eventStartTime: Moment(),
     fetchServices: false,
+    leadId: 0,
     loading: false,
+    patient: {
+      PATIENT_NAME: "",
+      PATIENT_TYPE: "",
+      PATIENT_ID: 0
+    },
     products: [],
     selectedProductId: "-select-",
     selectedSectionId: "-select-",
@@ -51,20 +58,53 @@ class App extends Component {
 
   componentWillMount() {
     BX24.init(() => {
+      let contactId = 0;
       let leadId = 0;
       const info = BX24.placement.info();
+      let type;
       if (
         info.placement === "CRM_LEAD_LIST_MENU" ||
         info.placement === "CRM_LEAD_DETAIL_TAB"
       ) {
         leadId = info.options.ID;
+        type = "crm.lead.get";
+      } else if (
+        info.placement === "CRM_CONTACT_LIST_MENU" ||
+        info.placement === "CRM_CONTACT_DETAIL_TAB"
+      ) {
+        contactId = info.options.ID;
+        type = "crm.contact.get";
       }
       const tableColumns = prepareTableColumns(
         this.state.startDate,
         this.state.currentDate
       );
-      const tableData = prepareTableData(this.handleShowModal);
-      this.setState({ leadId, tableColumns, tableData });
+      if (type) {
+        BX24.callMethod(
+          type,
+          { id: type === "crm.lead.get" ? leadId : contactId },
+          result => {
+            if (result.error()) {
+              notification.open({
+                duration: 2,
+                description: "Ошибка получения идентификатора пациента!"
+              });
+            } else {
+              const patientData = result.data();
+              const patient = {
+                PATIENT_NAME: `${patientData.LAST_NAME} ${patientData.NAME} ${
+                  patientData.SECOND_NAME
+                }`,
+                PATIENT_TYPE: type === "crm.lead.get" ? "lead" : "contact",
+                PATIENT_ID: patientData.ID
+              };
+              this.setState({ contactId, leadId, patient, tableColumns });
+            }
+          }
+        );
+      } else {
+        this.setState({ tableColumns });
+      }
     });
   }
 
@@ -120,7 +160,6 @@ class App extends Component {
             duration: 2,
             description: "Ошибка получения списка разделов услуг!"
           });
-          // console.error(result.error());
         } else {
           const sections = result.data();
           if (sections.length) {
@@ -128,8 +167,6 @@ class App extends Component {
           } else {
             this.getSectionProductList();
           }
-          //if(result.more())
-          //  result.next();
         }
       }
     );
@@ -157,8 +194,6 @@ class App extends Component {
       } else {
         const products = result.data();
         this.setState({ products });
-        //if(result.more())
-        //  result.next();
       }
     });
   };
@@ -347,13 +382,27 @@ class App extends Component {
                 items = [...deals];
               }
               if (items && items.length) {
-                const tableData = prepareTableDataWithEvents(
+                prepareTableDataWithEvents(
                   this.handleShowModal,
                   items,
                   this.state.startDate,
-                  this.state.tableData
+                  this.state.tableData,
+                  (err, result) => {
+                    if (err) {
+                      notification.open({
+                        duration: 2,
+                        description:
+                          "Ошибка получения событий календаря пользователя!"
+                      });
+                    } else {
+                      this.setState({
+                        loading: false,
+                        events: items,
+                        tableData: result
+                      });
+                    }
+                  }
                 );
-                this.setState({ loading: false, events: items, tableData });
               } else {
                 this.setState({ loading: false });
               }
@@ -364,7 +413,7 @@ class App extends Component {
     );
   };
 
-  handleShowModal = (date) => {
+  handleShowModal = date => {
     this.setState({ eventStartTime: date, visible: true });
   };
 
@@ -375,6 +424,7 @@ class App extends Component {
       endDate,
       eventStartTime,
       loading,
+      patient,
       products,
       sections,
       selectedProductId,
@@ -601,7 +651,7 @@ class App extends Component {
           </div>
           <div style={{ marginBottom: "5px" }}>
             <b>Клиент:</b>
-            <Input disabled={true} value={"кто то"} />
+            <Input disabled={true} value={patient.PATIENT_NAME} />
           </div>
         </Modal>
       </div>
