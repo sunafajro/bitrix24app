@@ -4,6 +4,8 @@ import { Button, notification, Switch } from "antd";
 
 class App extends Component {
   state = {
+    contactContext: false,
+    contactCard: false,
     leadContext: false,
     leadCard: false
   };
@@ -88,7 +90,7 @@ class App extends Component {
   };
 
   render() {
-    const { leadContext, leadCard } = this.state;
+    const { contactContext, contactCard, leadContext, leadCard } = this.state;
     return (
       <div style={{ padding: "1em" }}>
         <h2>Установка приложения.</h2>
@@ -109,6 +111,24 @@ class App extends Component {
             }
           />{" "}
           Добавить ссылку на приложение в карточку лида.
+        </div>
+        <div style={{ marginBottom: "1em" }}>
+          <Switch
+            checked={contactContext}
+            onChange={checked =>
+              this.onChange(checked, "contactContext", "CRM_CONTACT_LIST_MENU")
+            }
+          />{" "}
+          Добавить ссылку на приложение в контекстное меню контакта.
+        </div>
+        <div style={{ marginBottom: "1em" }}>
+          <Switch
+            checked={contactCard}
+            onChange={checked =>
+              this.onChange(checked, "contactCard", "CRM_CONTACT_DETAIL_TAB")
+            }
+          />{" "}
+          Добавить ссылку на приложение в карточку контакта.
         </div>
         <Button type="primary" onClick={this.finishInstallation}>
           Завершить!
