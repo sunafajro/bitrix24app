@@ -35,7 +35,8 @@ class App extends Component {
     patient: {
       PATIENT_NAME: "",
       PATIENT_TYPE: "",
-      PATIENT_ID: 0
+      PATIENT_ID: 0,
+      PATIENT_PHONE: { VALUE: " "}
     },
     products: [],
     selectedProductId: "-select-",
@@ -96,7 +97,8 @@ class App extends Component {
                   patientData.SECOND_NAME
                 }`,
                 PATIENT_TYPE: type === "crm.lead.get" ? "lead" : "contact",
-                PATIENT_ID: patientData.ID
+                PATIENT_ID: patientData.ID,
+                PATIENT_PHONE: patientData.PHONE && patientData.PHONE.length ? patientData.PHONE[0] : {VALUE: " "},
               };
               this.setState({ contactId, leadId, patient, tableColumns });
             }
@@ -383,6 +385,7 @@ class App extends Component {
               }
               if (items && items.length) {
                 prepareTableDataWithEvents(
+                  this.deleteEvent,
                   this.handleShowModal,
                   items,
                   this.state.startDate,
@@ -404,6 +407,11 @@ class App extends Component {
                   }
                 );
               } else {
+                this.handleSpecialistSelect(
+                  this.state.selectedSpecialistId,
+                  this.state.startDate,
+                  this.state.endDate
+                );
                 this.setState({ loading: false });
               }
             }
@@ -416,6 +424,90 @@ class App extends Component {
   handleShowModal = date => {
     this.setState({ eventStartTime: date, visible: true });
   };
+
+  handleCreateEvent = () => {
+    if (this.validate()) {
+      const product = this.state.products.filter(item => {
+        return item.ID === this.state.selectedProductId;
+      });
+      const communications = { ...this.state.patient.PATIENT_PHONE };
+      communications.ENTITY_ID = this.state.leadId
+      ? this.state.leadId
+      : this.state.contactId ? this.state.contactId : 0;
+      communications.ENTITY_TYPE_ID = this.state.leadId ? 1 : this.state.contactId ? 3 : 0;
+      let newDeal = {
+        COMMUNICATIONS: [communications],
+        OWNER_ID: this.state.leadId
+          ? this.state.leadId
+          : this.state.contactId ? this.state.contactId : 0,
+        OWNER_TYPE_ID: this.state.leadId ? 1 : this.state.contactId ? 3 : 0,
+        TYPE_ID: 1,
+        SUBJECT: product[0].NAME,
+        START_TIME: Moment(this.state.eventStartTime).format(),
+        END_TIME: Moment(this.state.eventStartTime)
+          .add(this.state.duration, "minutes")
+          .format(),
+        COMPLETED: "N",
+        PRIORITY: 2,
+        RESPONSIBLE_ID: this.state.selectedSpecialistId,
+        DESCRIPTION: "",
+        DESCRIPTION_TYPE: 1,
+        DIRECTION: 0
+      };
+      BX24.callMethod("crm.activity.add", { fields: newDeal }, result => {
+        if (result.error()) {
+          notification.open({
+            duration: 2,
+            description: "Ошибка при добавлении события!"
+          });
+        } else {
+          notification.open({
+            duration: 2,
+            description: "Событие успешно добавлено!"
+          });
+          this.setState({ visible: false });
+          this.handleSpecialistSelect(this.state.selectedSpecialistId, this.state.startDate, this.state.endDate);
+        }
+      });
+    } else {
+      notification.open({
+        duration: 2,
+        description: "Этот временной интервал уже занят!"
+      });
+    }
+  };
+
+  validate = () => {
+    let result = true;
+    const eventStartTime = Moment(this.state.eventStartTime);
+    const eventEndTime = Moment(this.state.eventStartTime).add(this.state.duration, "minutes");
+    for(let i = 0; i < this.state.events.length; i++) {
+      const startTime = Moment(this.state.events[i].DATE_FROM, "DD.MM.YYYY HH:mm:ss");
+      const endTime = Moment(this.state.events[i].DATE_TO, "DD.MM.YYYY HH:mm:ss");
+      if (Moment(eventStartTime).isSameOrAfter(startTime) && Moment(eventEndTime).isSameOrBefore(endTime)) {
+        result = false;
+        break;
+      }      
+    }
+    return result;
+  };
+
+  deleteEvent = (id) => {
+    BX24.callMethod("crm.activity.delete", {id}, result => {
+      if (result.error()) {
+        notification.open({
+          duration: 2,
+          description: "Ошибка при удалении события!"
+        });
+      } else {
+        notification.open({
+          duration: 2,
+          description: "Событие успешно удалено!"
+        });
+        this.handleSpecialistSelect(this.state.selectedSpecialistId, this.state.startDate, this.state.endDate);
+      }
+    });
+  }
 
   render() {
     const {
@@ -612,7 +704,7 @@ class App extends Component {
         ) : null}
         <Modal
           onCancel={() => this.setState({ visible: false })}
-          onOk={() => this.setState({ visible: false })}
+          onOk={() => this.handleCreateEvent()}
           title="Добавить событие"
           visible={visible}
         >

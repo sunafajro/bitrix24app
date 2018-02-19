@@ -1,7 +1,7 @@
 /* global BX24 */
 import React from "react";
 import Moment from "moment";
-import { Icon, Tag } from "antd";
+import { Button, Col, Icon, Row, Tag } from "antd";
 
 export const Aux = props => props.children;
 
@@ -16,7 +16,7 @@ const AddEventDiv = ({ date, handleShowModal }) => {
   );
 };
 
-export const prepareCellEntries = (cellDate, events, handleShowModal) => {
+export const prepareCellEntries = (cellDate, events, handleShowModal, deleteEvent) => {
   const dataEvents = events.filter(event => {
     const dateFrom = Moment(event.DATE_FROM, "DD.MM.YYYY HH:mm:ss").format(
       "YYYY-MM-DD"
@@ -33,17 +33,29 @@ export const prepareCellEntries = (cellDate, events, handleShowModal) => {
         dataEvents.map(item => (
           <div
             className="app-event-class-name"
-            style={{ backgroundColor: item.COLOR }}
+            style={{
+              backgroundColor: item.COLOR,
+              fontSize: "12px"
+            }}
             key={"user-event-" + item.ID}
           >
-            {`${item.DATE_FROM.substring(11, 16)} - ${item.DATE_TO.substring(
-              11,
-              16
-            )}`}
-            <br />
-            {item.NAME}
-            <br />
-            {item.PATIENT_NAME}
+            <Row>
+                {`${item.DATE_FROM.substring(
+                  11,
+                  16
+                )} - ${item.DATE_TO.substring(11, 16)}`}
+            <br />{item.NAME}
+            <br />{item.PATIENT_NAME}
+            { item.isDeal ? <div style={{position: "absolute", top: 0, right: 0}}>
+                <Button
+                  type="danger"
+                  size="small"
+                  shape="circle"
+                  icon="delete"
+                  onClick={() => deleteEvent(item.ID)}
+                />
+              </div> : null }
+            </Row>
           </div>
         ))}
     </Aux>
@@ -89,7 +101,8 @@ export const prepareTableColumns = (start, current) => {
       title: title,
       dataIndex: dayName,
       key: dayName,
-      className: "app-table-class-name"
+      className: "app-table-class-name",
+      width: "14%"
     });
   }
   return result;
@@ -119,6 +132,7 @@ export const prepareTableData = handleShowModal => {
  * заполняем строки таблицы событиями
  */
 export const prepareTableDataWithEvents = (
+  deleteEvent,
   handleShowModal,
   items,
   startDate,
@@ -179,7 +193,8 @@ export const prepareTableDataWithEvents = (
               newRow[cell] = prepareCellEntries(
                 cellStartDate,
                 events,
-                handleShowModal
+                handleShowModal,
+                deleteEvent
               );
               break;
             }
@@ -191,7 +206,8 @@ export const prepareTableDataWithEvents = (
               newRow[cell] = prepareCellEntries(
                 cellStartDate,
                 events,
-                handleShowModal
+                handleShowModal,
+                deleteEvent
               );
               break;
             }
@@ -203,7 +219,8 @@ export const prepareTableDataWithEvents = (
               newRow[cell] = prepareCellEntries(
                 cellStartDate,
                 events,
-                handleShowModal
+                handleShowModal,
+                deleteEvent
               );
               break;
             }
@@ -215,7 +232,8 @@ export const prepareTableDataWithEvents = (
               newRow[cell] = prepareCellEntries(
                 cellStartDate,
                 events,
-                handleShowModal
+                handleShowModal,
+                deleteEvent
               );
               break;
             }
@@ -227,7 +245,8 @@ export const prepareTableDataWithEvents = (
               newRow[cell] = prepareCellEntries(
                 cellStartDate,
                 events,
-                handleShowModal
+                handleShowModal,
+                deleteEvent
               );
               break;
             }
@@ -239,7 +258,8 @@ export const prepareTableDataWithEvents = (
               newRow[cell] = prepareCellEntries(
                 cellStartDate,
                 events,
-                handleShowModal
+                handleShowModal,
+                deleteEvent
               );
               break;
             }
@@ -251,7 +271,8 @@ export const prepareTableDataWithEvents = (
               newRow[cell] = prepareCellEntries(
                 cellStartDate,
                 events,
-                handleShowModal
+                handleShowModal,
+                deleteEvent
               );
               break;
             }
@@ -271,16 +292,18 @@ export const prepareTableDataWithEvents = (
 export const sortAndFixItems = data => {
   data.forEach(item => {
     if (item.hasOwnProperty("START_TIME") && item.hasOwnProperty("END_TIME")) {
-      const dateFrom = Moment.utc(item.START_TIME);
-      const dateTo = Moment.utc(item.END_TIME);
+      const dateFrom = item.START_TIME; // Moment.utc(item.START_TIME);
+      const dateTo = item.END_TIME; // Moment.utc(item.END_TIME);
       item.DATE_FROM = Moment(dateFrom).format("DD.MM.YYYY HH:mm:ss");
       item.DATE_TO = Moment(dateTo).format("DD.MM.YYYY HH:mm:ss");
       item.NAME = item.SUBJECT;
       /* дела заливаем светло-зеленым */
       item.COLOR = "#dbfccd";
+      item.isDeal = true;
     } else {
       /* события без дел (отсуствие на работе) заливаем серым */
       item.COLOR = "#eeeeee";
+      item.isDeal = false;
     }
   });
   data.sort((a, b) => {
