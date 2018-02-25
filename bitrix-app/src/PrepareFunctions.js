@@ -1,7 +1,7 @@
 /* global BX24 */
 import React from "react";
 import Moment from "moment";
-import { Button, Col, Icon, Row, Tag } from "antd";
+import { Button, Icon, Popconfirm, Row, Tag } from "antd";
 
 export const Aux = props => props.children;
 
@@ -47,13 +47,14 @@ export const prepareCellEntries = (cellDate, events, handleShowModal, deleteEven
             <br />{item.NAME}
             <br />{item.PATIENT_NAME}
             { item.isDeal ? <div style={{position: "absolute", top: 0, right: 0}}>
+              <Popconfirm title="Вы уверены？" okText="Да" onConfirm={() => deleteEvent(item.ID)} cancelText="Нет">
                 <Button
                   type="danger"
                   size="small"
                   shape="circle"
                   icon="delete"
-                  onClick={() => deleteEvent(item.ID)}
                 />
+                </Popconfirm>
               </div> : null }
             </Row>
           </div>

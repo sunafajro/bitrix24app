@@ -2,6 +2,7 @@
 import React, { Component } from "react";
 import Moment from "moment";
 import {
+  Alert,
   Button,
   Col,
   Input,
@@ -24,6 +25,10 @@ const Option = Select.Option;
 
 class App extends Component {
   state = {
+    administrator: {
+      id: 0,
+      name: ""
+    },
     contactId: 0,
     currentDate: Moment().format("YYYY-MM-DD"),
     duration: "",
@@ -36,7 +41,7 @@ class App extends Component {
       PATIENT_NAME: "",
       PATIENT_TYPE: "",
       PATIENT_ID: 0,
-      PATIENT_PHONE: { VALUE: " "}
+      PATIENT_PHONE: { VALUE: " " }
     },
     products: [],
     selectedProductId: "-select-",
@@ -53,6 +58,7 @@ class App extends Component {
       .format("YYYY-MM-DD"),
     tableColumns: [],
     tableData: [],
+    timerange: [],
     users: [],
     visible: false
   };
@@ -63,6 +69,12 @@ class App extends Component {
       let leadId = 0;
       const info = BX24.placement.info();
       let type;
+      let timerange = [];
+      for (let h = 15; h < 19; h++) {
+        for (let m = 0; m < 60; m = m + 5) {
+          timerange.push(h + ":" + (m < 10 ? "0" + m : m) + ":00");
+        }
+      }
       if (
         info.placement === "CRM_LEAD_LIST_MENU" ||
         info.placement === "CRM_LEAD_DETAIL_TAB"
@@ -98,14 +110,23 @@ class App extends Component {
                 }`,
                 PATIENT_TYPE: type === "crm.lead.get" ? "lead" : "contact",
                 PATIENT_ID: patientData.ID,
-                PATIENT_PHONE: patientData.PHONE && patientData.PHONE.length ? patientData.PHONE[0] : {VALUE: " "},
+                PATIENT_PHONE:
+                  patientData.PHONE && patientData.PHONE.length
+                    ? patientData.PHONE[0]
+                    : { VALUE: " " }
               };
-              this.setState({ contactId, leadId, patient, tableColumns });
+              this.setState({
+                contactId,
+                leadId,
+                patient,
+                tableColumns,
+                timerange
+              });
             }
           }
         );
       } else {
-        this.setState({ tableColumns });
+        this.setState({ tableColumns, timerange });
       }
     });
   }
@@ -113,6 +134,7 @@ class App extends Component {
   componentDidMount() {
     this.getProductSectionList();
     this.getUsers();
+    this.getAppParams();
   }
 
   /* получает список сотрудников */
@@ -141,6 +163,30 @@ class App extends Component {
           notification.open({
             duration: 2,
             description: "Не найдено ни одного пользователя!"
+          });
+        }
+      }
+    });
+  };
+
+  getAppParams = () => {
+    BX24.callMethod("entity.item.get", { ENTITY: "settings" }, result => {
+      if (result.error()) {
+        notification.open({
+          duration: 2,
+          description: "Ошибка получения параметров приложения!"
+        });
+      } else {
+        const rawSettings = result.data();
+        if (
+          rawSettings.length &&
+          rawSettings[0].hasOwnProperty("PROPERTY_VALUES")
+        ) {
+          this.setState({
+            administrator: {
+              id: rawSettings[0].PROPERTY_VALUES.userAdministratorId,
+              name: rawSettings[0].PROPERTY_VALUES.userAdministratorName
+            }
           });
         }
       }
@@ -432,9 +478,11 @@ class App extends Component {
       });
       const communications = { ...this.state.patient.PATIENT_PHONE };
       communications.ENTITY_ID = this.state.leadId
-      ? this.state.leadId
-      : this.state.contactId ? this.state.contactId : 0;
-      communications.ENTITY_TYPE_ID = this.state.leadId ? 1 : this.state.contactId ? 3 : 0;
+        ? this.state.leadId
+        : this.state.contactId ? this.state.contactId : 0;
+      communications.ENTITY_TYPE_ID = this.state.leadId
+        ? 1
+        : this.state.contactId ? 3 : 0;
       let newDeal = {
         COMMUNICATIONS: [communications],
         OWNER_ID: this.state.leadId
@@ -454,6 +502,7 @@ class App extends Component {
         DESCRIPTION_TYPE: 1,
         DIRECTION: 0
       };
+      /* добавляем событие для специалиста */
       BX24.callMethod("crm.activity.add", { fields: newDeal }, result => {
         if (result.error()) {
           notification.open({
@@ -465,35 +514,109 @@ class App extends Component {
             duration: 2,
             description: "Событие успешно добавлено!"
           });
+          const eventId = result.data();
           this.setState({ visible: false });
-          this.handleSpecialistSelect(this.state.selectedSpecialistId, this.state.startDate, this.state.endDate);
+          this.handleSpecialistSelect(
+            this.state.selectedSpecialistId,
+            this.state.startDate,
+            this.state.endDate
+          );
+          const checkDate = Moment(
+            Moment(newDeal.START_TIME)
+              .startOf("day")
+              .subtract("1", "days")
+              .format("YYYY-MM-DD") + " 15:00:00",
+            "YYYY-MM-DD HH:mm:ss"
+          );
+          /* добавляем звонок для администратора */
+          if (
+            this.state.patient.PATIENT_PHONE &&
+            Moment().isBefore(checkDate) &&
+            this.state.administrator.id
+          ) {
+            const newCommunications = { ...this.state.patient.PATIENT_PHONE };
+            const newStartDate = Moment(
+              Moment(newDeal.START_TIME)
+                .startOf("day")
+                .subtract("1", "days")
+                .format("YYYY-MM-DD") +
+                " " +
+                this.state.timerange[Math.floor(Math.random() * 48)],
+              "YYYY-MM-DD HH:mm:ss"
+            );
+            const newEndDate = Moment(newStartDate).add("5", "minutes");
+            newDeal.COMMUNICATIONS = [newCommunications];
+            newDeal.START_TIME = Moment(newStartDate).format();
+            newDeal.END_TIME = Moment(newEndDate).format();
+            newDeal.SUBJECT =
+              "Контрольный звонок для события [" + eventId + "]";
+            newDeal.TYPE_ID = 2;
+            newDeal.RESPONSIBLE_ID = this.state.administrator.id;
+            BX24.callMethod("crm.activity.add", { fields: newDeal }, result => {
+              if (result.error()) {
+                notification.open({
+                  duration: 2,
+                  description:
+                    "Ошибка при добавлении предварительного звонка для администратора!"
+                });
+              } else {
+                notification.open({
+                  duration: 2,
+                  description:
+                    "Предварительный звонок для администратора успешно добавлен!"
+                });
+              }
+            });
+          }
         }
-      });
-    } else {
-      notification.open({
-        duration: 2,
-        description: "Этот временной интервал уже занят!"
       });
     }
   };
 
   validate = () => {
     let result = true;
+
+    if (this.state.patient.PATIENT_ID === 0) {
+      notification.open({
+        duration: 2,
+        description:
+          "Невозможно добавить событие. Отсуствует информация о клиенте!"
+      });
+      return false;
+    }
+
     const eventStartTime = Moment(this.state.eventStartTime);
-    const eventEndTime = Moment(this.state.eventStartTime).add(this.state.duration, "minutes");
-    for(let i = 0; i < this.state.events.length; i++) {
-      const startTime = Moment(this.state.events[i].DATE_FROM, "DD.MM.YYYY HH:mm:ss");
-      const endTime = Moment(this.state.events[i].DATE_TO, "DD.MM.YYYY HH:mm:ss");
-      if (Moment(eventStartTime).isSameOrAfter(startTime) && Moment(eventEndTime).isSameOrBefore(endTime)) {
+    const eventEndTime = Moment(this.state.eventStartTime).add(
+      this.state.duration,
+      "minutes"
+    );
+    for (let i = 0; i < this.state.events.length; i++) {
+      const startTime = Moment(
+        this.state.events[i].DATE_FROM,
+        "DD.MM.YYYY HH:mm:ss"
+      );
+      const endTime = Moment(
+        this.state.events[i].DATE_TO,
+        "DD.MM.YYYY HH:mm:ss"
+      );
+      if (
+        Moment(eventStartTime).isSameOrAfter(startTime) &&
+        Moment(eventEndTime).isSameOrBefore(endTime)
+      ) {
         result = false;
+        notification.open({
+          duration: 2,
+          description: "Этот временной интервал уже занят!"
+        });
         break;
-      }      
+      }
     }
     return result;
   };
 
-  deleteEvent = (id) => {
-    BX24.callMethod("crm.activity.delete", {id}, result => {
+  deleteEvent = id => {
+    /* удаляем событие специалиста */
+    BX24.callMethod("crm.activity.delete", { id }, result => {
       if (result.error()) {
         notification.open({
           duration: 2,
@@ -504,10 +627,56 @@ class App extends Component {
           duration: 2,
           description: "Событие успешно удалено!"
         });
-        this.handleSpecialistSelect(this.state.selectedSpecialistId, this.state.startDate, this.state.endDate);
+        this.handleSpecialistSelect(
+          this.state.selectedSpecialistId,
+          this.state.startDate,
+          this.state.endDate
+        );
+        /* ищем предварительный звонок связанный с событием */
+        BX24.callMethod(
+          "crm.activity.list",
+          {
+            filter: {
+              "%SUBJECT": "[" + id + "]"
+            }
+          },
+          result => {
+            if (result.error()) {
+              notification.open({
+                duration: 2,
+                description:
+                  "Ошибка при удалении предварительного звонка для администратора!"
+              });
+            } else {
+              const data = result.data();
+              if (data.length) {
+                /* удаляем звонок  */
+                BX24.callMethod(
+                  "crm.activity.delete",
+                  { id: data[0].ID },
+                  result => {
+                    if (result.error()) {
+                      notification.open({
+                        duration: 2,
+                        description:
+                          "Ошибка при удалении предварительного звонка для администратора!"
+                      });
+                    } else {
+                      notification.open({
+                        duration: 2,
+                        description:
+                          "Предварительный звонок для администратора успешно удален!"
+                      });
+                    }
+                  }
+                );
+              }
+            }
+          }
+        );
       }
     });
-  }
+  };
 
   render() {
     const {
@@ -535,6 +704,7 @@ class App extends Component {
     };
     let productList = {};
     let specialistList = {};
+
     let sectionOptions = [
       <Option key="select-section" value="-select-" disabled>
         -выберите категорию-
@@ -549,7 +719,6 @@ class App extends Component {
         );
       });
     }
-
     const SECTIONS = (
       <Select
         defaultValue="-select-"
@@ -578,7 +747,6 @@ class App extends Component {
         productList[product.ID] = product.NAME;
       });
     }
-
     const PRODUCTS = (
       <Select
         defaultValue="-select-"
@@ -607,7 +775,6 @@ class App extends Component {
         specialistList[specialist.ID] = specialist.NAME;
       });
     }
-
     const SPECIALISTS = (
       <Select
         defaultValue="-select-"
@@ -620,6 +787,7 @@ class App extends Component {
         {specialistOptions}
       </Select>
     );
+
     return (
       <div style={{ marginBottom: "1em" }}>
         <Row style={{ marginBottom: "0.5em" }}>
@@ -715,16 +883,18 @@ class App extends Component {
                 <TimePicker
                   format={timeFormat}
                   onChange={time => this.setState({ eventStartTime: time })}
+                  size="small"
                   value={Moment(eventStartTime)}
                 />
               </Col>
               <Col span={8}>
-                <Input disabled={true} value={duration} />
+                <Input disabled={true} size="small" value={duration} />
               </Col>
               <Col span={8} style={{ textAlign: "right" }}>
                 <TimePicker
                   disabled={true}
                   format={timeFormat}
+                  size="small"
                   value={Moment(eventStartTime).add(duration, "minutes")}
                 />
               </Col>
@@ -732,20 +902,33 @@ class App extends Component {
           </div>
           <div style={{ marginBottom: "5px" }}>
             <b>Услуга:</b>
-            <Input disabled={true} value={productList[selectedProductId]} />
+            <Input
+              disabled={true}
+              size="small"
+              value={productList[selectedProductId]}
+            />
           </div>
           <div style={{ marginBottom: "5px" }}>
             <b>Специалист:</b>
             <Input
               disabled={true}
+              size="small"
               value={specialistList[selectedSpecialistId]}
             />
           </div>
           <div style={{ marginBottom: "5px" }}>
             <b>Клиент:</b>
-            <Input disabled={true} value={patient.PATIENT_NAME} />
+            <Input disabled={true} size="small" value={patient.PATIENT_NAME} />
           </div>
         </Modal>
+        {patient.PATIENT_ID === 0 && (
+          <Alert
+            message="Приложение запущено не из лида или контакта, добавление событий в расписание ограничено!"
+            style={{ marginTop: "5px" }}
+            type="warning"
+            showIcon
+          />
+        )}
       </div>
     );
   }
