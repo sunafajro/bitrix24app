@@ -545,6 +545,7 @@ class App extends Component {
               "YYYY-MM-DD HH:mm:ss"
             );
             const newEndDate = Moment(newStartDate).add("5", "minutes");
+            newDeal.DESCRIPTION = "Начало приема: " + newDeal.START_TIME + "\nУслуга: " + newDeal.SUBJECT + "\n";
             newDeal.COMMUNICATIONS = [newCommunications];
             newDeal.START_TIME = Moment(newStartDate).format();
             newDeal.END_TIME = Moment(newEndDate).format();
