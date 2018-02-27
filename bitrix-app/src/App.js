@@ -17,11 +17,11 @@ import {
   Aux,
   prepareSpecialistByProduct,
   prepareTableColumns,
-  prepareTableData,
   prepareTableDataWithEvents
 } from "./PrepareFunctions";
 
 const Option = Select.Option;
+const DISABLED_HOURS = [0, 1, 2, 3, 4, 5, 6, 7, 20, 21, 22, 23];
 
 class App extends Component {
   state = {
@@ -34,6 +34,7 @@ class App extends Component {
     duration: "",
     events: [],
     eventStartTime: Moment(),
+    eventEndTime: Moment(),
     fetchServices: false,
     leadId: 0,
     loading: false,
@@ -307,7 +308,11 @@ class App extends Component {
               });
             } else {
               const rawProductData = result.data();
-              const duration = rawProductData[durationProp].value;
+              const duration =
+                rawProductData.hasOwnProperty("durationProp") &&
+                rawProductData[durationProp].value
+                  ? rawProductData[durationProp].value
+                  : null;
               let specialists = [];
               if (rawProductData && rawProductData[specialistProp]) {
                 /* наполняем массив с id специалистов связанных с услугой */
@@ -375,10 +380,7 @@ class App extends Component {
    */
   handleSpecialistSelect = (id, startDate, endDate) => {
     this.setState({
-      loading: true,
-      events: [],
-      selectedSpecialistId: id,
-      tableData: prepareTableData(this.handleShowModal)
+      loading: true
     });
     /* Возвращает список событий календаря. */
     BX24.callMethod(
@@ -429,37 +431,28 @@ class App extends Component {
               } else if (!events.length && deals.length) {
                 items = [...deals];
               }
-              if (items && items.length) {
-                prepareTableDataWithEvents(
-                  this.deleteEvent,
-                  this.handleShowModal,
-                  items,
-                  this.state.startDate,
-                  this.state.tableData,
-                  (err, result) => {
-                    if (err) {
-                      notification.open({
-                        duration: 2,
-                        description:
-                          "Ошибка получения событий календаря пользователя!"
-                      });
-                    } else {
-                      this.setState({
-                        loading: false,
-                        events: items,
-                        tableData: result
-                      });
-                    }
+              prepareTableDataWithEvents(
+                this.deleteEvent,
+                this.handleShowModal,
+                items,
+                this.state.startDate,
+                (err, result) => {
+                  if (err) {
+                    notification.open({
+                      duration: 2,
+                      description:
+                        "Ошибка получения событий календаря пользователя!"
+                    });
+                  } else {
+                    this.setState({
+                      loading: false,
+                      events: items,
+                      selectedSpecialistId: id,
+                      tableData: result
+                    });
                   }
-                );
-              } else {
-                this.handleSpecialistSelect(
-                  this.state.selectedSpecialistId,
-                  this.state.startDate,
-                  this.state.endDate
-                );
-                this.setState({ loading: false });
-              }
+                }
+              );
             }
           );
         }
@@ -468,7 +461,7 @@ class App extends Component {
   };
 
   handleShowModal = date => {
-    this.setState({ eventStartTime: date, visible: true });
+    this.setState({ eventStartTime: date, eventEndTime: date, visible: true });
   };
 
   handleCreateEvent = () => {
@@ -492,9 +485,9 @@ class App extends Component {
         TYPE_ID: 1,
         SUBJECT: product[0].NAME,
         START_TIME: Moment(this.state.eventStartTime).format(),
-        END_TIME: Moment(this.state.eventStartTime)
-          .add(this.state.duration, "minutes")
-          .format(),
+        END_TIME: this.state.duration
+        ? Moment(this.state.eventStartTime).add(this.state.duration, "minutes").format()
+        : Moment(this.state.eventEndTime).format(),
         COMPLETED: "N",
         PRIORITY: 2,
         RESPONSIBLE_ID: this.state.selectedSpecialistId,
@@ -545,7 +538,12 @@ class App extends Component {
               "YYYY-MM-DD HH:mm:ss"
             );
             const newEndDate = Moment(newStartDate).add("5", "minutes");
-            newDeal.DESCRIPTION = "Начало приема: " + newDeal.START_TIME + "\nУслуга: " + newDeal.SUBJECT + "\n";
+            newDeal.DESCRIPTION =
+              "Начало приема: " +
+              newDeal.START_TIME +
+              "\nУслуга: " +
+              newDeal.SUBJECT +
+              "\n";
             newDeal.COMMUNICATIONS = [newCommunications];
             newDeal.START_TIME = Moment(newStartDate).format();
             newDeal.END_TIME = Moment(newEndDate).format();
@@ -553,6 +551,7 @@ class App extends Component {
               "Контрольный звонок для события [" + eventId + "]";
             newDeal.TYPE_ID = 2;
             newDeal.RESPONSIBLE_ID = this.state.administrator.id;
+            newDeal.DIRECTION = 1;
             BX24.callMethod("crm.activity.add", { fields: newDeal }, result => {
               if (result.error()) {
                 notification.open({
@@ -587,10 +586,9 @@ class App extends Component {
     }
 
     const eventStartTime = Moment(this.state.eventStartTime);
-    const eventEndTime = Moment(this.state.eventStartTime).add(
-      this.state.duration,
-      "minutes"
-    );
+    const eventEndTime = this.state.duration
+      ? Moment(this.state.eventStartTime).add(this.state.duration, "minutes")
+      : Moment(this.state.eventEndTime);
     for (let i = 0; i < this.state.events.length; i++) {
       const startTime = Moment(
         this.state.events[i].DATE_FROM,
@@ -685,6 +683,7 @@ class App extends Component {
       duration,
       endDate,
       eventStartTime,
+      eventEndTime,
       loading,
       patient,
       products,
@@ -882,7 +881,10 @@ class App extends Component {
             <Row>
               <Col span={8}>
                 <TimePicker
+                  disabledHours={() => DISABLED_HOURS}
                   format={timeFormat}
+                  hideDisabledOptions={true}
+                  minuteStep={5}
                   onChange={time => this.setState({ eventStartTime: time })}
                   size="small"
                   value={Moment(eventStartTime)}
@@ -893,10 +895,18 @@ class App extends Component {
               </Col>
               <Col span={8} style={{ textAlign: "right" }}>
                 <TimePicker
-                  disabled={true}
+                  disabledHours={() => DISABLED_HOURS}
+                  disabled={duration ? true : false}
                   format={timeFormat}
+                  hideDisabledOptions={true}
+                  minuteStep={5}
+                  onChange={time => this.setState({ eventEndTime: time })}
                   size="small"
-                  value={Moment(eventStartTime).add(duration, "minutes")}
+                  value={
+                    duration
+                      ? Moment(eventStartTime).add(duration, "minutes")
+                      : Moment(eventEndTime)
+                  }
                 />
               </Col>
             </Row>

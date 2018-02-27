@@ -16,7 +16,12 @@ const AddEventDiv = ({ date, handleShowModal }) => {
   );
 };
 
-export const prepareCellEntries = (cellDate, events, handleShowModal, deleteEvent) => {
+export const prepareCellEntries = (
+  cellDate,
+  events,
+  handleShowModal,
+  deleteEvent
+) => {
   const dataEvents = events.filter(event => {
     const dateFrom = Moment(event.DATE_FROM, "DD.MM.YYYY HH:mm:ss").format(
       "YYYY-MM-DD"
@@ -29,7 +34,7 @@ export const prepareCellEntries = (cellDate, events, handleShowModal, deleteEven
   return (
     <Aux>
       <AddEventDiv date={Moment(cellDate)} handleShowModal={handleShowModal} />
-      {dataEvents.length &&
+      {dataEvents.length ?
         dataEvents.map(item => (
           <div
             className="app-event-class-name"
@@ -40,32 +45,42 @@ export const prepareCellEntries = (cellDate, events, handleShowModal, deleteEven
             key={"user-event-" + item.ID}
           >
             <Row>
-                {`${item.DATE_FROM.substring(
-                  11,
-                  16
-                )} - ${item.DATE_TO.substring(11, 16)}`}
-            <br />{item.NAME}
-            <br />{item.PATIENT_NAME}
-            { item.isDeal ? <div style={{position: "absolute", top: 0, right: 0}}>
-              <Popconfirm title="Вы уверены？" okText="Да" onConfirm={() => deleteEvent(item.ID)} cancelText="Нет">
-                <Button
-                  type="danger"
-                  size="small"
-                  shape="circle"
-                  icon="delete"
-                />
-                </Popconfirm>
-              </div> : null }
+              {`${item.DATE_FROM.substring(11, 16)} - ${item.DATE_TO.substring(
+                11,
+                16
+              )}`}
+              <br />
+              {item.NAME}
+              <br />
+              {item.PATIENT_NAME}
+              {item.isDeal ? (
+                <div style={{ position: "absolute", top: 0, right: 0 }}>
+                  <Popconfirm
+                    title="Вы уверены？"
+                    okText="Да"
+                    onConfirm={() => deleteEvent(item.ID)}
+                    cancelText="Нет"
+                  >
+                    <Button
+                      type="danger"
+                      size="small"
+                      shape="circle"
+                      icon="delete"
+                    />
+                  </Popconfirm>
+                </div>
+              ) : null}
             </Row>
           </div>
-        ))}
+        )) : null}
     </Aux>
   );
 };
 
 /**
- * @param {Array} data
  * получает массив id сотрудников и возвращает массив объектов с id и name сотрудника
+ * @param {Array} users
+ * @param {Array} data
  */
 export const prepareSpecialistByProduct = (users, data) => {
   let result = [];
@@ -112,9 +127,8 @@ export const prepareTableColumns = (start, current) => {
 /**
  * готовит пустые строки таблицы
  */
-export const prepareTableData = handleShowModal => {
-  let result = [];
-  result.push({
+export const emptyTableData = () => {
+  return {
     key: "table-row",
     пн: "",
     вт: "",
@@ -123,8 +137,7 @@ export const prepareTableData = handleShowModal => {
     пт: "",
     сб: "",
     вс: ""
-  });
-  return result;
+  };
 };
 
 /**
@@ -137,7 +150,6 @@ export const prepareTableDataWithEvents = (
   handleShowModal,
   items,
   startDate,
-  tableData,
   callback
 ) => {
   /* формируем пул промисов для запроса данных пациента */
@@ -181,107 +193,104 @@ export const prepareTableDataWithEvents = (
     data => {
       let result = [];
       const events = sortAndFixItems(data);
-      tableData.forEach(row => {
-        let newRow = {
-          key: row.key
-        };
-        Object.keys(row).forEach(cell => {
-          switch (cell) {
-            case "пн": {
-              const cellStartDate = Moment(startDate)
-                .startOf("week")
-                .format("YYYY-MM-DD");
-              newRow[cell] = prepareCellEntries(
-                cellStartDate,
-                events,
-                handleShowModal,
-                deleteEvent
-              );
-              break;
-            }
-            case "вт": {
-              const cellStartDate = Moment(startDate)
-                .startOf("week")
-                .add(1, "days")
-                .format("YYYY-MM-DD");
-              newRow[cell] = prepareCellEntries(
-                cellStartDate,
-                events,
-                handleShowModal,
-                deleteEvent
-              );
-              break;
-            }
-            case "ср": {
-              const cellStartDate = Moment(startDate)
-                .startOf("week")
-                .add(2, "days")
-                .format("YYYY-MM-DD");
-              newRow[cell] = prepareCellEntries(
-                cellStartDate,
-                events,
-                handleShowModal,
-                deleteEvent
-              );
-              break;
-            }
-            case "чт": {
-              const cellStartDate = Moment(startDate)
-                .startOf("week")
-                .add(3, "days")
-                .format("YYYY-MM-DD");
-              newRow[cell] = prepareCellEntries(
-                cellStartDate,
-                events,
-                handleShowModal,
-                deleteEvent
-              );
-              break;
-            }
-            case "пт": {
-              const cellStartDate = Moment(startDate)
-                .startOf("week")
-                .add(4, "days")
-                .format("YYYY-MM-DD");
-              newRow[cell] = prepareCellEntries(
-                cellStartDate,
-                events,
-                handleShowModal,
-                deleteEvent
-              );
-              break;
-            }
-            case "сб": {
-              const cellStartDate = Moment(startDate)
-                .startOf("week")
-                .add(5, "days")
-                .format("YYYY-MM-DD");
-              newRow[cell] = prepareCellEntries(
-                cellStartDate,
-                events,
-                handleShowModal,
-                deleteEvent
-              );
-              break;
-            }
-            case "вс": {
-              const cellStartDate = Moment(startDate)
-                .startOf("week")
-                .add(6, "days")
-                .format("YYYY-MM-DD");
-              newRow[cell] = prepareCellEntries(
-                cellStartDate,
-                events,
-                handleShowModal,
-                deleteEvent
-              );
-              break;
-            }
-            default:
+      const columns = emptyTableData();
+      let newRow = { key: "table-row" };
+      Object.keys(columns).forEach(cell => {
+        switch (cell) {
+          case "пн": {
+            const cellStartDate = Moment(startDate)
+              .startOf("week")
+              .format("YYYY-MM-DD");
+            newRow[cell] = prepareCellEntries(
+              cellStartDate,
+              events,
+              handleShowModal,
+              deleteEvent
+            );
+            break;
           }
-        });
-        result.push(newRow);
+          case "вт": {
+            const cellStartDate = Moment(startDate)
+              .startOf("week")
+              .add(1, "days")
+              .format("YYYY-MM-DD");
+            newRow[cell] = prepareCellEntries(
+              cellStartDate,
+              events,
+              handleShowModal,
+              deleteEvent
+            );
+            break;
+          }
+          case "ср": {
+            const cellStartDate = Moment(startDate)
+              .startOf("week")
+              .add(2, "days")
+              .format("YYYY-MM-DD");
+            newRow[cell] = prepareCellEntries(
+              cellStartDate,
+              events,
+              handleShowModal,
+              deleteEvent
+            );
+            break;
+          }
+          case "чт": {
+            const cellStartDate = Moment(startDate)
+              .startOf("week")
+              .add(3, "days")
+              .format("YYYY-MM-DD");
+            newRow[cell] = prepareCellEntries(
+              cellStartDate,
+              events,
+              handleShowModal,
+              deleteEvent
+            );
+            break;
+          }
+          case "пт": {
+            const cellStartDate = Moment(startDate)
+              .startOf("week")
+              .add(4, "days")
+              .format("YYYY-MM-DD");
+            newRow[cell] = prepareCellEntries(
+              cellStartDate,
+              events,
+              handleShowModal,
+              deleteEvent
+            );
+            break;
+          }
+          case "сб": {
+            const cellStartDate = Moment(startDate)
+              .startOf("week")
+              .add(5, "days")
+              .format("YYYY-MM-DD");
+            newRow[cell] = prepareCellEntries(
+              cellStartDate,
+              events,
+              handleShowModal,
+              deleteEvent
+            );
+            break;
+          }
+          case "вс": {
+            const cellStartDate = Moment(startDate)
+              .startOf("week")
+              .add(6, "days")
+              .format("YYYY-MM-DD");
+            newRow[cell] = prepareCellEntries(
+              cellStartDate,
+              events,
+              handleShowModal,
+              deleteEvent
+            );
+            break;
+          }
+          default:
+        }
       });
+      result.push(newRow);
       callback(null, result);
     },
     reason => {
