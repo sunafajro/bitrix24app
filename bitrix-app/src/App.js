@@ -551,7 +551,7 @@ class App extends Component {
               "Контрольный звонок для события [" + eventId + "]";
             newDeal.TYPE_ID = 2;
             newDeal.RESPONSIBLE_ID = this.state.administrator.id;
-            newDeal.DIRECTION = 1;
+            newDeal.DIRECTION = 2;
             BX24.callMethod("crm.activity.add", { fields: newDeal }, result => {
               if (result.error()) {
                 notification.open({
