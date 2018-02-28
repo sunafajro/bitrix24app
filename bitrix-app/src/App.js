@@ -196,6 +196,7 @@ class App extends Component {
 
   /* получает список разделов товаров */
   getProductSectionList = () => {
+    let sections = [];
     BX24.callMethod(
       "crm.productsection.list",
       {
@@ -210,11 +211,15 @@ class App extends Component {
             description: "Ошибка получения списка разделов услуг!"
           });
         } else {
-          const sections = result.data();
-          if (sections.length) {
-            this.setState({ sections });
+          sections = sections.concat(result.data());
+          if (result.more()) {
+            result.next();
           } else {
-            this.getSectionProductList();
+            if (sections.length) {
+              this.setState({ sections });
+            } else {
+              this.getSectionProductList();
+            }
           }
         }
       }
@@ -233,6 +238,7 @@ class App extends Component {
     if (sectionId) {
       criteria.filter = { SECTION_ID: sectionId };
     }
+    let products = [];
     /* Возвращает список товаров по фильтру. */
     BX24.callMethod("crm.product.list", criteria, result => {
       if (result.error()) {
@@ -241,8 +247,12 @@ class App extends Component {
           description: "Ошибка получения списка услуг!"
         });
       } else {
-        const products = result.data();
-        this.setState({ products });
+        products = products.concat(result.data());
+        if (result.more()) {
+          result.next();
+        } else {
+          this.setState({ products });
+        }
       }
     });
   };
@@ -382,7 +392,7 @@ class App extends Component {
     this.setState({
       loading: true
     });
-    /* Возвращает список событий календаря. */
+    /* получаем список событий календаря. */
     BX24.callMethod(
       "calendar.event.get",
       {
@@ -399,6 +409,8 @@ class App extends Component {
           });
         } else {
           let events = result.data();
+          let deals = [];
+          /* Получаем список "дел" пользователя */
           BX24.callMethod(
             "crm.activity.list",
             {
@@ -410,49 +422,53 @@ class App extends Component {
               }
             },
             result => {
-              const deals = result.data();
-              let items = [];
-              if (events.length && deals.length) {
-                deals.forEach(deal => {
-                  events = events.filter(event => {
-                    return (
-                      !Moment(Moment.utc(deal.START_TIME)).isSame(
-                        Moment(event.DATE_FROM, "DD.MM.YYYY HH:mm:ss")
-                      ) &&
-                      !Moment(Moment.utc(deal.END_TIME)).isSame(
-                        Moment(event.DATE_TO, "DD.MM.YYYY HH:mm:ss")
-                      )
-                    );
+              deals = deals.concat(result.data());
+              if (result.more()) {
+                result.next();
+              } else {
+                let items = [];
+                if (events.length && deals.length) {
+                  deals.forEach(deal => {
+                    events = events.filter(event => {
+                      return (
+                        !Moment(Moment.utc(deal.START_TIME)).isSame(
+                          Moment(event.DATE_FROM, "DD.MM.YYYY HH:mm:ss")
+                        ) &&
+                        !Moment(Moment.utc(deal.END_TIME)).isSame(
+                          Moment(event.DATE_TO, "DD.MM.YYYY HH:mm:ss")
+                        )
+                      );
+                    });
                   });
-                });
-                items = [...events, ...deals];
-              } else if (events.length && !deals.length) {
-                items = [...events];
-              } else if (!events.length && deals.length) {
-                items = [...deals];
-              }
-              prepareTableDataWithEvents(
-                this.deleteEvent,
-                this.handleShowModal,
-                items,
-                this.state.startDate,
-                (err, result) => {
-                  if (err) {
-                    notification.open({
-                      duration: 2,
-                      description:
-                        "Ошибка получения событий календаря пользователя!"
-                    });
-                  } else {
-                    this.setState({
-                      loading: false,
-                      events: items,
-                      selectedSpecialistId: id,
-                      tableData: result
-                    });
-                  }
+                  items = [...events, ...deals];
+                } else if (events.length && !deals.length) {
+                  items = [...events];
+                } else if (!events.length && deals.length) {
+                  items = [...deals];
                 }
-              );
+                prepareTableDataWithEvents(
+                  this.deleteEvent,
+                  this.handleShowModal,
+                  items,
+                  this.state.startDate,
+                  (err, result) => {
+                    if (err) {
+                      notification.open({
+                        duration: 2,
+                        description:
+                          "Ошибка получения событий календаря пользователя!"
+                      });
+                    } else {
+                      this.setState({
+                        loading: false,
+                        events: items,
+                        selectedSpecialistId: id,
+                        tableData: result
+                      });
+                    }
+                  }
+                );
+              }
             }
           );
         }
@@ -472,28 +488,32 @@ class App extends Component {
       const communications = { ...this.state.patient.PATIENT_PHONE };
       communications.ENTITY_ID = this.state.leadId
         ? this.state.leadId
-        : this.state.contactId ? this.state.contactId : 0;
+        : this.state.contactId ? this.state.contactId : "0";
       communications.ENTITY_TYPE_ID = this.state.leadId
-        ? 1
-        : this.state.contactId ? 3 : 0;
+        ? "1"
+        : this.state.contactId ? "3" : "0";
       let newDeal = {
         COMMUNICATIONS: [communications],
         OWNER_ID: this.state.leadId
           ? this.state.leadId
-          : this.state.contactId ? this.state.contactId : 0,
-        OWNER_TYPE_ID: this.state.leadId ? 1 : this.state.contactId ? 3 : 0,
-        TYPE_ID: 1,
+          : this.state.contactId ? this.state.contactId : "0",
+        OWNER_TYPE_ID: this.state.leadId
+          ? "1"
+          : this.state.contactId ? "3" : "0",
+        TYPE_ID: "1",
         SUBJECT: product[0].NAME,
         START_TIME: Moment(this.state.eventStartTime).format(),
         END_TIME: this.state.duration
-        ? Moment(this.state.eventStartTime).add(this.state.duration, "minutes").format()
-        : Moment(this.state.eventEndTime).format(),
+          ? Moment(this.state.eventStartTime)
+              .add(this.state.duration, "minutes")
+              .format()
+          : Moment(this.state.eventEndTime).format(),
         COMPLETED: "N",
-        PRIORITY: 2,
+        PRIORITY: "2",
         RESPONSIBLE_ID: this.state.selectedSpecialistId,
         DESCRIPTION: "",
-        DESCRIPTION_TYPE: 1,
-        DIRECTION: 0
+        DESCRIPTION_TYPE: "1",
+        DIRECTION: "0"
       };
       /* добавляем событие для специалиста */
       BX24.callMethod("crm.activity.add", { fields: newDeal }, result => {
@@ -549,9 +569,9 @@ class App extends Component {
             newDeal.END_TIME = Moment(newEndDate).format();
             newDeal.SUBJECT =
               "Контрольный звонок для события [" + eventId + "]";
-            newDeal.TYPE_ID = 2;
+            newDeal.TYPE_ID = "2";
             newDeal.RESPONSIBLE_ID = this.state.administrator.id;
-            newDeal.DIRECTION = 2;
+            newDeal.DIRECTION = "2";
             BX24.callMethod("crm.activity.add", { fields: newDeal }, result => {
               if (result.error()) {
                 notification.open({
@@ -740,7 +760,11 @@ class App extends Component {
     if (products.length) {
       products.forEach(product => {
         productOptions.push(
-          <Option key={"opt-" + product.ID} value={product.ID}>
+          <Option
+            key={"opt-" + product.ID}
+            title={product.NAME}
+            value={product.ID}
+          >
             {product.NAME}
           </Option>
         );
@@ -789,12 +813,20 @@ class App extends Component {
     );
 
     return (
-      <div style={{ marginBottom: "1em" }}>
-        <Row style={{ marginBottom: "0.5em" }}>
-          <Col span={6}>{SECTIONS}</Col>
-          <Col span={6}>{PRODUCTS}</Col>
-          <Col span={6}>{SPECIALISTS}</Col>
-          <Col span={6} style={{ textAlign: "right" }}>
+      <div style={{ padding: "5px", marginBottom: "1em" }}>
+        <Row>
+          <Col xs={{span: 24}} sm={{ span: 24}} md={{ span: 8}} lg={{ span: 8}} xl={{ span: 8}} xxl={{ span: 8 }} style={{ paddingRight: "5px", marginBottom: "0.5em" }}>
+            {SECTIONS}
+          </Col>
+          <Col xs={{span: 24}} sm={{ span: 24}} md={{ span: 16}} lg={{ span: 16}} xl={{ span: 16}} xxl={{ span: 16 }} style={{ paddingRight: "5px", marginBottom: "0.5em" }}>
+            {PRODUCTS}
+          </Col>
+        </Row>
+        <Row>
+          <Col xs={{span: 24}} sm={{ span: 24}} md={{ span: 8}} lg={{ span: 8}} xl={{ span: 8}} xxl={{ span: 8 }} style={{ paddingRight: "5px", marginBottom: "0.5em" }}>
+            {SPECIALISTS}
+          </Col>
+          <Col xs={{span: 24}} sm={{ span: 24}} md={{ span: 16}} lg={{ span: 16}} xl={{ span: 16}} xxl={{ span: 16 }} style={{ paddingRight: "5px", marginBottom: "0.5em", textAlign: "right" }}>
             {selectedSpecialistId && selectedSpecialistId !== "-select-" ? (
               <Aux>
                 <Button
