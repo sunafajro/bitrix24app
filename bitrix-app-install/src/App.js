@@ -1,4 +1,4 @@
-/* global BX24 */
+/* global BX24 window */
 import React, { Component } from "react";
 import Moment from 'moment';
 import { Button, notification, Select, Switch } from "antd";
@@ -61,7 +61,7 @@ class App extends Component {
       "placement.bind",
       {
         PLACEMENT: placement,
-        HANDLER: "https://app.evgenybelkin.ru/index.php",
+        HANDLER: window.origin + "/index.php",
         TITLE: "Регистратура",
         DESCRIPTION: "Тестовое приложение Регистратура"
       },
@@ -88,7 +88,7 @@ class App extends Component {
       "placement.unbind",
       {
         PLACEMENT: placement,
-        HANDLER: "https://app.evgenybelkin.ru/index.php"
+        HANDLER: window.origin + "/index.php"
       },
       result => {
         if (result.error()) {
