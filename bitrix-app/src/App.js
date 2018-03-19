@@ -1,6 +1,7 @@
 /* global BX24 */
 import React, { Component } from "react";
 import Moment from "moment";
+import axios from 'axios';
 import {
   Alert,
   Button,
@@ -33,8 +34,8 @@ class App extends Component {
     currentDate: Moment().format("YYYY-MM-DD"),
     duration: "",
     events: [],
-    eventStartTime: Moment(),
-    eventEndTime: Moment(),
+    eventStartTime: Moment().add(8, "hours"),
+    eventEndTime: Moment().add(8, "hours"),
     fetchServices: false,
     leadId: 0,
     loading: false,
@@ -136,6 +137,39 @@ class App extends Component {
     this.getProductSectionList();
     this.getUsers();
     this.getAppParams();
+  }
+
+  sendSms = () => {
+    const message = this.state.eventStartTime ? encodeURI("Вы записаны на прием " + Moment(this.state.eventStartTime).format('DD.MM.YYYY HH:MM') + ". Отменить/Перенести по телефону +7(8352)32-40-29.") : null;
+    const number = this.state.patient && this.state.patient.hasOwnProperty('PATIENT_PHONE') && this.state.patient.PATIENT_PHONE.hasOwnProperty('VALUE') && this.state.patient.PATIENT_PHONE.VALUE && this.state.patient.PATIENT_PHONE.VALUE !== " " ? this.state.patient.PATIENT_PHONE.VALUE.match(/\d/g).join("") : null;
+    if (number && message) {
+      axios(`/send-sms.php?message=${message}&number=${number}`)
+      .then(result => {
+        if (result.status_code === 100) {
+          notification.open({
+            duration: 2,
+            description: "СМС уведомление успешно отправлено!"
+          });          
+        } else if (result.status_code === 201) {
+          notification.open({
+            duration: 2,
+            description: "Недостаточно средств для отправки СМС уведомления!"
+          });
+        }
+        return true;
+      })
+      .catch(err => {
+        notification.open({
+          duration: 2,
+          description: "Ошибка! " + err.message
+        });
+      });
+    } else {
+      notification.open({
+        duration: 2,
+        description: "Телефон или дата встречи не заданы!"
+      });
+    }
   }
 
   /* получает список сотрудников */
@@ -717,6 +751,7 @@ class App extends Component {
       tableData,
       visible
     } = this.state;
+
     const timeFormat = "HH:mm";
     const pagination = {
       hideOnSinglePage: true,
@@ -913,6 +948,7 @@ class App extends Component {
             <Row>
               <Col span={8}>
                 <TimePicker
+                  defaultValue={Moment(eventStartTime)}
                   disabledHours={() => DISABLED_HOURS}
                   format={timeFormat}
                   hideDisabledOptions={true}
@@ -927,17 +963,17 @@ class App extends Component {
               </Col>
               <Col span={8} style={{ textAlign: "right" }}>
                 <TimePicker
+                  defaultValue={Moment(eventStartTime).add(30, "minutes")}
                   disabledHours={() => DISABLED_HOURS}
-                  disabled={duration ? true : false}
+                  //disabled={duration ? true : false}
                   format={timeFormat}
                   hideDisabledOptions={true}
                   minuteStep={5}
                   onChange={time => this.setState({ eventEndTime: time })}
                   size="small"
                   value={
-                    duration
-                      ? Moment(eventStartTime).add(duration, "minutes")
-                      : Moment(eventEndTime)
+                    //duration ? Moment(eventStartTime).add(duration, "minutes"):
+                    Moment(eventEndTime)
                   }
                 />
               </Col>
@@ -961,7 +997,8 @@ class App extends Component {
           </div>
           <div style={{ marginBottom: "5px" }}>
             <b>Клиент:</b>
-            <Input disabled={true} size="small" value={patient.PATIENT_NAME} />
+            <Input style={{ marginBottom: "5px" }} disabled={true} size="small" value={patient.PATIENT_NAME} />
+            { patient && patient.hasOwnProperty('PATIENT_PHONE') && patient.PATIENT_PHONE.hasOwnProperty('VALUE') && patient.PATIENT_PHONE.VALUE && patient.PATIENT_PHONE.VALUE !== " " ? <Button style={{ float: 'right'}} size="small" type="primary" onClick={this.sendSms}>Отправить СМС!</Button> : null }
           </div>
         </Modal>
         {patient.PATIENT_ID === 0 && (
