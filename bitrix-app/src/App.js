@@ -1,7 +1,7 @@
 /* global BX24 */
 import React, { Component } from "react";
 import Moment from "moment";
-import axios from 'axios';
+import axios from "axios";
 import {
   Alert,
   Button,
@@ -34,8 +34,8 @@ class App extends Component {
     currentDate: Moment().format("YYYY-MM-DD"),
     duration: "",
     events: [],
-    eventStartTime: Moment().add(8, "hours"),
-    eventEndTime: Moment().add(8, "hours"),
+    eventStartTime: Moment(),
+    eventEndTime: Moment(),
     fetchServices: false,
     leadId: 0,
     loading: false,
@@ -140,37 +140,56 @@ class App extends Component {
   }
 
   sendSms = () => {
-    const message = this.state.eventStartTime ? encodeURI("Вы записаны на прием " + Moment(this.state.eventStartTime).format('DD.MM.YYYY HH:MM') + ". Отменить/Перенести по телефону +7(8352)32-40-29.") : null;
-    const number = this.state.patient && this.state.patient.hasOwnProperty('PATIENT_PHONE') && this.state.patient.PATIENT_PHONE.hasOwnProperty('VALUE') && this.state.patient.PATIENT_PHONE.VALUE && this.state.patient.PATIENT_PHONE.VALUE !== " " ? this.state.patient.PATIENT_PHONE.VALUE.match(/\d/g).join("") : null;
+    const message = this.state.eventStartTime
+      ? encodeURI(
+          "Вы записаны на прием " +
+            Moment(this.state.eventStartTime).format("DD.MM.YYYY HH:mm") +
+            ". Отменить/Перенести по телефону +7(8352)32-40-29."
+        )
+      : null;
+    const number =
+      this.state.patient &&
+      this.state.patient.hasOwnProperty("PATIENT_PHONE") &&
+      this.state.patient.PATIENT_PHONE.hasOwnProperty("VALUE") &&
+      this.state.patient.PATIENT_PHONE.VALUE &&
+      this.state.patient.PATIENT_PHONE.VALUE !== " "
+        ? this.state.patient.PATIENT_PHONE.VALUE.match(/\d/g).join("")
+        : null;
     if (number && message) {
-      axios(`/send-sms.php?message=${message}&number=${number}`)
-      .then(result => {
-        if (result.status_code === 100) {
+      axios
+        .post(`/send-sms.php`, {
+          auth_key:
+            "32342ba3df54aa464c790d5ddb9fdbabedcaaa2369da98877d234895b8ff892f",
+          number: number,
+          message: message,
+          api_key: "6C26B34D-37ED-CB09-CEF5-1BE47677F3AD"
+        })
+        .then(result => {
+          if (result.status === 200) {
+            notification.open({
+              duration: 2,
+              description: result.data.status_text
+                ? result.data.status_text
+                : result.data.status_code === 100
+                  ? "СМС уведомление успешно отправлено!"
+                  : "Произошла ошибка"
+            });
+            return true;
+          }
+        })
+        .catch(err => {
           notification.open({
             duration: 2,
-            description: "СМС уведомление успешно отправлено!"
-          });          
-        } else if (result.status_code === 201) {
-          notification.open({
-            duration: 2,
-            description: "Недостаточно средств для отправки СМС уведомления!"
+            description: "Ошибка! " + err.message
           });
-        }
-        return true;
-      })
-      .catch(err => {
-        notification.open({
-          duration: 2,
-          description: "Ошибка! " + err.message
         });
-      });
     } else {
       notification.open({
         duration: 2,
         description: "Телефон или дата встречи не заданы!"
       });
     }
-  }
+  };
 
   /* получает список сотрудников */
   getUsers = () => {
@@ -639,31 +658,32 @@ class App extends Component {
       return false;
     }
 
-    const eventStartTime = Moment(this.state.eventStartTime);
-    const eventEndTime = this.state.duration
-      ? Moment(this.state.eventStartTime).add(this.state.duration, "minutes")
-      : Moment(this.state.eventEndTime);
-    for (let i = 0; i < this.state.events.length; i++) {
-      const startTime = Moment(
-        this.state.events[i].DATE_FROM,
-        "DD.MM.YYYY HH:mm:ss"
-      );
-      const endTime = Moment(
-        this.state.events[i].DATE_TO,
-        "DD.MM.YYYY HH:mm:ss"
-      );
-      if (
-        Moment(eventStartTime).isSameOrAfter(startTime) &&
-        Moment(eventEndTime).isSameOrBefore(endTime)
-      ) {
-        result = false;
-        notification.open({
-          duration: 2,
-          description: "Этот временной интервал уже занят!"
-        });
-        break;
-      }
-    }
+    // проверка на то что дата внемя уже заняты ранее - временно отключаем
+    // const eventStartTime = Moment(this.state.eventStartTime);
+    // const eventEndTime = this.state.duration
+    //   ? Moment(this.state.eventStartTime).add(this.state.duration, "minutes")
+    //   : Moment(this.state.eventEndTime);
+    // for (let i = 0; i < this.state.events.length; i++) {
+    //   const startTime = Moment(
+    //     this.state.events[i].DATE_FROM,
+    //     "DD.MM.YYYY HH:mm:ss"
+    //   );
+    //   const endTime = Moment(
+    //     this.state.events[i].DATE_TO,
+    //     "DD.MM.YYYY HH:mm:ss"
+    //   );
+    // if (
+    //   Moment(eventStartTime).isSameOrAfter(startTime) &&
+    //   Moment(eventEndTime).isSameOrBefore(endTime)
+    // ) {
+    //   result = false;
+    //   notification.open({
+    //     duration: 2,
+    //     description: "Этот временной интервал уже занят!"
+    //   });
+    //   break;
+    // }
+    // }
     return result;
   };
 
@@ -850,18 +870,54 @@ class App extends Component {
     return (
       <div style={{ padding: "5px", marginBottom: "1em" }}>
         <Row>
-          <Col xs={{span: 24}} sm={{ span: 24}} md={{ span: 8}} lg={{ span: 8}} xl={{ span: 8}} xxl={{ span: 8 }} style={{ paddingRight: "5px", marginBottom: "0.5em" }}>
+          <Col
+            xs={{ span: 24 }}
+            sm={{ span: 24 }}
+            md={{ span: 8 }}
+            lg={{ span: 8 }}
+            xl={{ span: 8 }}
+            xxl={{ span: 8 }}
+            style={{ paddingRight: "5px", marginBottom: "0.5em" }}
+          >
             {SECTIONS}
           </Col>
-          <Col xs={{span: 24}} sm={{ span: 24}} md={{ span: 16}} lg={{ span: 16}} xl={{ span: 16}} xxl={{ span: 16 }} style={{ paddingRight: "5px", marginBottom: "0.5em" }}>
+          <Col
+            xs={{ span: 24 }}
+            sm={{ span: 24 }}
+            md={{ span: 16 }}
+            lg={{ span: 16 }}
+            xl={{ span: 16 }}
+            xxl={{ span: 16 }}
+            style={{ paddingRight: "5px", marginBottom: "0.5em" }}
+          >
             {PRODUCTS}
           </Col>
         </Row>
         <Row>
-          <Col xs={{span: 24}} sm={{ span: 24}} md={{ span: 8}} lg={{ span: 8}} xl={{ span: 8}} xxl={{ span: 8 }} style={{ paddingRight: "5px", marginBottom: "0.5em" }}>
+          <Col
+            xs={{ span: 24 }}
+            sm={{ span: 24 }}
+            md={{ span: 8 }}
+            lg={{ span: 8 }}
+            xl={{ span: 8 }}
+            xxl={{ span: 8 }}
+            style={{ paddingRight: "5px", marginBottom: "0.5em" }}
+          >
             {SPECIALISTS}
           </Col>
-          <Col xs={{span: 24}} sm={{ span: 24}} md={{ span: 16}} lg={{ span: 16}} xl={{ span: 16}} xxl={{ span: 16 }} style={{ paddingRight: "5px", marginBottom: "0.5em", textAlign: "right" }}>
+          <Col
+            xs={{ span: 24 }}
+            sm={{ span: 24 }}
+            md={{ span: 16 }}
+            lg={{ span: 16 }}
+            xl={{ span: 16 }}
+            xxl={{ span: 16 }}
+            style={{
+              paddingRight: "5px",
+              marginBottom: "0.5em",
+              textAlign: "right"
+            }}
+          >
             {selectedSpecialistId && selectedSpecialistId !== "-select-" ? (
               <Aux>
                 <Button
@@ -940,7 +996,7 @@ class App extends Component {
         <Modal
           onCancel={() => this.setState({ visible: false })}
           onOk={() => this.handleCreateEvent()}
-          title="Добавить событие"
+          title={`Добавить событие на ${Moment(eventStartTime).format("DD.MM.YYYY")}`}
           visible={visible}
         >
           <div style={{ marginBottom: "5px" }}>
@@ -997,8 +1053,26 @@ class App extends Component {
           </div>
           <div style={{ marginBottom: "5px" }}>
             <b>Клиент:</b>
-            <Input style={{ marginBottom: "5px" }} disabled={true} size="small" value={patient.PATIENT_NAME} />
-            { patient && patient.hasOwnProperty('PATIENT_PHONE') && patient.PATIENT_PHONE.hasOwnProperty('VALUE') && patient.PATIENT_PHONE.VALUE && patient.PATIENT_PHONE.VALUE !== " " ? <Button style={{ float: 'right'}} size="small" type="primary" onClick={this.sendSms}>Отправить СМС!</Button> : null }
+            <Input
+              style={{ marginBottom: "5px" }}
+              disabled={true}
+              size="small"
+              value={patient.PATIENT_NAME}
+            />
+            {patient &&
+            patient.hasOwnProperty("PATIENT_PHONE") &&
+            patient.PATIENT_PHONE.hasOwnProperty("VALUE") &&
+            patient.PATIENT_PHONE.VALUE &&
+            patient.PATIENT_PHONE.VALUE !== " " ? (
+              <Button
+                style={{ float: "right" }}
+                size="small"
+                type="primary"
+                onClick={this.sendSms}
+              >
+                Отправить СМС!
+              </Button>
+            ) : null}
           </div>
         </Modal>
         {patient.PATIENT_ID === 0 && (
