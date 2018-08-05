@@ -155,7 +155,7 @@ export const prepareTableDataWithEvents = (
   /* формируем пул промисов для запроса данных пациента */
   const EventsPromises = items.map(item => {
     let type;
-    if (item.hasOwnProperty("OWNER_TYPE_ID")) {
+    if (item.hasOwnProperty("OWNER_TYPE_ID") && (item.OWNER_TYPE_ID === 1 || item.OWNER_TYPE_ID === 3)) {
       switch (item.OWNER_TYPE_ID) {
         /* встреча создана от лида */
         case "1":
