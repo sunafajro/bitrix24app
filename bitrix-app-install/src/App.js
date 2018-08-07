@@ -1,257 +1,146 @@
 /* global BX24 window */
 import React, { Component } from "react";
-import Moment from 'moment';
-import { Button, notification, Select, Switch } from "antd";
+import Button from "antd/lib/button";
+import Input from "antd/lib/input";
+import Switch from "antd/lib/switch";
+import {
+  CONTACT_CARD,
+  CONTACT_CONTEXT,
+  ENTITY_ADD,
+  ENTITY_ITEM_ADD,
+  ENTITY_ITEM_PROPERTY_ADD,
+  getEntityData,
+  LEAD_CARD,
+  LEAD_CONTEXT,
+  NEW_STORAGE,
+  SMS_API_KEY,
+  SMS_AUTH_KEY,
+  USER_ADMINISTRATOR_ID,
+  USER_ADMINISTRATOR_NAME
+} from "./defaults";
+import {
+  getUsers,
+  handleBindPlacement,
+  handleUnbindPlacement,
+  notify
+} from "./actions";
+import { SelectComponent } from "./Select";
 
-const Option = Select.Option;
-
-class App extends Component {
+export default class App extends Component {
   state = {
-    contactContext: false,
     contactCard: false,
-    leadContext: false,
+    contactContext: false,
     leadCard: false,
+    leadContext: false,
     selectedUserId: "",
+    smsApiKey: "",
+    smsAuthKey: "",
     users: []
   };
 
-  componentWillMount() {
-    BX24.init(function() {});
-  }
-
   componentDidMount() {
-    this.getUsers();
-  }
-
-  /* получает список сотрудников */
-  getUsers = () => {
-    BX24.callMethod("user.get", {}, result => {
-      if (result.error()) {
-        notification.open({
-          duration: 2,
-          description: "Ошибка получения пользователей!"
-        });
-      } else {
-        const rawUsers = result.data();
-        let users = [];
-        if (rawUsers && rawUsers.length) {
-          rawUsers.forEach(user => {
-            if (user.LAST_NAME) {
-              users.push({
-                id: user.ID,
-                name: user.LAST_NAME + " " + user.NAME
-              });
-            }
-          });
-        }
-        if (users.length) {
+    BX24.init(() => {
+      getUsers()
+        .then(users => {
           this.setState({ users });
-        } else {
-          notification.open({
-            duration: 2,
-            description: "Не найдено ни одного пользователя!"
-          });
-        }
-      }
+        })
+        .catch(err => notify(err));
     });
-  };
-
-  handleBindPlacement = (placement, key) => {
-    BX24.callMethod(
-      "placement.bind",
-      {
-        PLACEMENT: placement,
-        HANDLER: window.origin + "/index.php",
-        TITLE: "Регистратура",
-        DESCRIPTION: "Тестовое приложение Регистратура"
-      },
-      result => {
-        if (result.error()) {
-          notification.open({
-            duration: 2,
-            description: "При добавлении элемента произошла ошибка!"
-          });
-          this.setState({ [key]: this.setState[key] });
-        } else {
-          notification.open({
-            duration: 2,
-            description: "Элемент успешно добавлен!"
-          });
-          this.setState({ [key]: true });
-        }
-      }
-    );
-  };
-
-  handleUnbindPlacement = (placement, key) => {
-    BX24.callMethod(
-      "placement.unbind",
-      {
-        PLACEMENT: placement,
-        HANDLER: window.origin + "/index.php"
-      },
-      result => {
-        if (result.error()) {
-          notification.open({
-            duration: 2,
-            description: "При удалении элемента произошла ошибка!"
-          });
-          this.setState({ [key]: this.setState[key] });
-        } else {
-          notification.open({
-            duration: 2,
-            description: "Элемент успешно удален!"
-          });
-          this.setState({ [key]: false });
-        }
-      }
-    );
-  };
+  }
 
   finishInstallation = () => {
     let batch = [];
     const userAdministrator = this.state.users.filter(item => {
       return item.id === this.state.selectedUserId;
     })[0];
+    /* готовим значения для записи в хранилище */
     const VALUES = {
-      isContactContextLinkEnabled: this.state.contactContext.toString(),
-      isContactCardLinkEnabled: this.state.contactCard.toString(),
-      isLeadContextLinkEnabled: this.state.leadContext.toString(),
-      isLeadCardLinkEnabled: this.state.leadCard.toString(),
-      userAdministratorId: this.state.selectedUserId,
-      userAdministratorName: userAdministrator.name.toString(),
+      isContactCardLinkEnabled: String(this.state.contactCard),
+      isContactContextLinkEnabled: String(this.state.contactContext),
+      isLeadCardLinkEnabled: String(this.state.leadCard),
+      isLeadContextLinkEnabled: String(this.state.leadContext),
+      smsApiKey: String(this.state.smsApiKey),
+      smsAuthKey: String(this.state.smsAuthKey),
+      userAdministratorId: String(this.state.selectedUserId),
+      userAdministratorName: String(userAdministrator.name)
     };
     /* добавляем хранилище */
-    batch.push([
-      "entity.add",
-      { ENTITY: "settings", NAME: "Settings", ACCESS: { AU: "W" } }
-    ]);
+    batch.push([ENTITY_ADD, NEW_STORAGE]);
     /* добавляем свойства объекта хранилища  */
-    batch.push([
-      "entity.item.property.add",
-      {
-        ENTITY: "settings",
-        PROPERTY: "isContactContextLinkEnabled",
-        NAME: "Link placed In Contact Context",
-        TYPE: "S"
-      }
-    ]);
-    batch.push([
-      "entity.item.property.add",
-      {
-        ENTITY: "settings",
-        PROPERTY: "isContactCardLinkEnabled",
-        NAME: "Link placed In Contact Card",
-        TYPE: "S"
-      }
-    ]);
-    batch.push([
-      "entity.item.property.add",
-      {
-        ENTITY: "settings",
-        PROPERTY: "isLeadContextLinkEnabled",
-        NAME: "Link placed In Lead Context",
-        TYPE: "S"
-      }
-    ]);
-    batch.push([
-      "entity.item.property.add",
-      {
-        ENTITY: "settings",
-        PROPERTY: "isLeadCardLinkEnabled",
-        NAME: "Link placed In Lead Card",
-        TYPE: "S"
-      }
-    ]);
-    batch.push([
-      "entity.item.property.add",
-      {
-        ENTITY: "settings",
-        PROPERTY: "userAdministratorId",
-        NAME: "User administrator ID",
-        TYPE: "S"
-      }
-    ]);
-    batch.push([
-      "entity.item.property.add",
-      {
-        ENTITY: "settings",
-        PROPERTY: "userAdministratorName",
-        NAME: "User administrator name",
-        TYPE: "S"
-      }
-    ]);
+    batch.push([ENTITY_ITEM_PROPERTY_ADD, CONTACT_CARD]);
+    batch.push([ENTITY_ITEM_PROPERTY_ADD, CONTACT_CONTEXT]);
+    batch.push([ENTITY_ITEM_PROPERTY_ADD, LEAD_CARD]);
+    batch.push([ENTITY_ITEM_PROPERTY_ADD, LEAD_CONTEXT]);
+    batch.push([ENTITY_ITEM_PROPERTY_ADD, SMS_API_KEY]);
+    batch.push([ENTITY_ITEM_PROPERTY_ADD, SMS_AUTH_KEY]);
+    batch.push([ENTITY_ITEM_PROPERTY_ADD, USER_ADMINISTRATOR_ID]);
+    batch.push([ENTITY_ITEM_PROPERTY_ADD, USER_ADMINISTRATOR_NAME]);
     /* добавляем значения */
-    batch.push([
-      "entity.item.add",
-      {
-        ENTITY: "settings",
-        DATE_ACTIVE_FROM: Moment().format(),
-        NAME: 'App options',
-        PROPERTY_VALUES: VALUES,
-      }
-    ]);
+    batch.push([ENTITY_ITEM_ADD, getEntityData(VALUES)]);
     BX24.callBatch(batch, () => {
-      BX24.callMethod("entity.item.get", { ENTITY: "settings" }, result => {
-        if (result.error()) {
-          notification.open({
-            duration: 2,
-            description: "Ошибка сохранения параметров приложения!"
-          });
-        } else {
-          notification.open({
-            duration: 2,
-            description: "Параметры приложения успешно сохранены!"
-          });
-          BX24.installFinish();
+      BX24.callMethod(
+        "entity.item.get",
+        {
+          ENTITY: "settings"
+        },
+        result => {
+          if (result.error()) {
+            notify("Ошибка сохранения параметров приложения!");
+          } else {
+            notify("Параметры приложения успешно сохранены!");
+            BX24.installFinish();
+          }
         }
-      });
+      );
     });
   };
 
+  /**
+   * @param { string } key
+   * @param { string } placement
+   * @param { boolean } value
+   * @return { void }
+   */
   onChange = (value, key, placement) => {
     if (value) {
-      this.handleBindPlacement(placement, key);
+      handleBindPlacement(placement, key, window.origin)
+        .then(result => {
+          notify(result);
+          this.setState({ [key]: true });
+        })
+        .catch(err => {
+          notify(err);
+          this.setState({ [key]: this.setState[key] });
+        });
     } else {
-      this.handleUnbindPlacement(placement, key);
+      handleUnbindPlacement(placement, key, window.origin)
+        .then(result => {
+          notify(result);
+          this.setState({ [key]: true });
+        })
+        .catch(err => {
+          notify(err);
+          this.setState({ [key]: this.setState[key] });
+        });
     }
+  };
+
+  handleUpdate = value => {
+    this.setState({ selectedUserId: value });
   };
 
   render() {
     const {
-      contactContext,
       contactCard,
-      leadContext,
+      contactContext,
       leadCard,
+      leadContext,
       selectedUserId,
+      smsApiKey,
+      smsAuthKey,
       users
     } = this.state;
-    let userOptions = [
-      <Option key="select-user" value="-select-">
-        -выберите пользователя-
-      </Option>
-    ];
-    if (users && users.length) {
-      users.forEach(user => {
-        userOptions.push(
-          <Option key={"opt-" + user.id} value={user.id}>
-            {user.name}
-          </Option>
-        );
-      });
-    }
 
-    const USERS = (
-      <Select
-        defaultValue="-select-"
-        disabled={users.length ? false : true}
-        onChange={val => this.setState({ selectedUserId: val })}
-        style={{ width: "100%", marginRight: "0.5em" }}
-        value={selectedUserId}
-      >
-        {userOptions}
-      </Select>
-    );
     return (
       <div style={{ padding: "1em" }}>
         <h2>Установка приложения.</h2>
@@ -293,7 +182,25 @@ class App extends Component {
         </div>
         <div style={{ marginBottom: "1em" }}>
           <b>Администратор:</b>
-          {USERS}
+          <SelectComponent
+            update={this.handleUpdate}
+            users={users}
+            value={selectedUserId}
+          />
+        </div>
+        <div style={{ marginBottom: "1em" }}>
+          <b>SMS API KEY:</b>
+          <Input
+            value={smsApiKey}
+            onChange={e => this.setState({ smsApiKey: e.target.value })}
+          />
+        </div>
+        <div style={{ marginBottom: "1em" }}>
+          <b>SMS AUTH KEY:</b>
+          <Input
+            value={smsAuthKey}
+            onChange={e => this.setState({ smsAuthKey: e.target.value })}
+          />
         </div>
         <Button type="primary" onClick={this.finishInstallation}>
           Завершить!
@@ -302,5 +209,3 @@ class App extends Component {
     );
   }
 }
-
-export default App;
