@@ -1,8 +1,6 @@
 /* global BX24 window */
 import React, { Component } from "react";
-import Button from "antd/lib/button";
-import Input from "antd/lib/input";
-import Switch from "antd/lib/switch";
+import { Button } from "antd";
 import {
   CONTACT_CARD,
   CONTACT_CONTEXT,
@@ -19,12 +17,17 @@ import {
   USER_ADMINISTRATOR_NAME
 } from "./defaults";
 import {
+  appInit,
+  callBatch,
+  getEntityItem,
   getUsers,
-  handleBindPlacement,
-  handleUnbindPlacement,
-  notify
-} from "./actions";
-import { SelectComponent } from "./Select";
+  handlePlacement,
+  placementGet
+} from "./Actions";
+import { notify } from "./Utils";
+import { InputSMS } from "./InputSMS";
+import { SelectUser } from "./SelectUser";
+import { Switchers } from "./Switchers";
 
 export default class App extends Component {
   state = {
@@ -39,12 +42,41 @@ export default class App extends Component {
   };
 
   componentDidMount() {
-    BX24.init(() => {
-      getUsers()
-        .then(users => {
-          this.setState({ users });
-        })
-        .catch(err => notify(err));
+    let newStateData = {};
+    appInit().then(() => {
+      placementGet().then(placements => {
+        if (Array.isArray(placements) && placements.length) {
+          if (placements.indexOf("CRM_CONTACT_DETAIL_TAB") !== -1) {
+            newStateData.contactCard = true;
+          }
+          if (placements.indexOf("CRM_CONTACT_LIST_MENU") !== -1) {
+            newStateData.contactContext = true;
+          }
+          if (placements.indexOf("CRM_LEAD_DETAIL_TAB") !== -1) {
+            newStateData.leadCard = true;
+          }
+          if (placements.indexOf("CRM_LEAD_LIST_MENU") !== -1) {
+            newStateData.leadContext = true;
+          }
+        }
+        getUsers()
+          .then(users => {
+            if (Array.isArray(users) && users.length) {
+              newStateData.users = [...users];
+            } else {
+              notify("Не найдено ни одного пользователя!");
+            }
+            if (Object.keys(newStateData).length) {
+              this.setState(newStateData);
+            }
+          })
+          .catch(() => {
+            notify("Ошибка получения пользователей!");
+            if (Object.keys(newStateData).length) {
+              this.setState(newStateData);
+            }
+          });
+      });
     });
   }
 
@@ -54,7 +86,7 @@ export default class App extends Component {
       return item.id === this.state.selectedUserId;
     })[0];
     /* готовим значения для записи в хранилище */
-    const VALUES = {
+    const VALUES = getEntityData({
       isContactCardLinkEnabled: String(this.state.contactCard),
       isContactContextLinkEnabled: String(this.state.contactContext),
       isLeadCardLinkEnabled: String(this.state.leadCard),
@@ -63,7 +95,7 @@ export default class App extends Component {
       smsAuthKey: String(this.state.smsAuthKey),
       userAdministratorId: String(this.state.selectedUserId),
       userAdministratorName: String(userAdministrator.name)
-    };
+    });
     /* добавляем хранилище */
     batch.push([ENTITY_ADD, NEW_STORAGE]);
     /* добавляем свойства объекта хранилища  */
@@ -76,22 +108,14 @@ export default class App extends Component {
     batch.push([ENTITY_ITEM_PROPERTY_ADD, USER_ADMINISTRATOR_ID]);
     batch.push([ENTITY_ITEM_PROPERTY_ADD, USER_ADMINISTRATOR_NAME]);
     /* добавляем значения */
-    batch.push([ENTITY_ITEM_ADD, getEntityData(VALUES)]);
-    BX24.callBatch(batch, () => {
-      BX24.callMethod(
-        "entity.item.get",
-        {
-          ENTITY: "settings"
-        },
-        result => {
-          if (result.error()) {
-            notify("Ошибка сохранения параметров приложения!");
-          } else {
-            notify("Параметры приложения успешно сохранены!");
-            BX24.installFinish();
-          }
-        }
-      );
+    batch.push([ENTITY_ITEM_ADD, VALUES]);
+    callBatch(batch).then(() => {
+      getEntityItem()
+        .then(() => {
+          notify("Параметры приложения успешно сохранены!");
+          BX24.installFinish();
+        })
+        .catch(() => notify("Ошибка сохранения параметров приложения!"));
     });
   };
 
@@ -102,31 +126,39 @@ export default class App extends Component {
    * @return { void }
    */
   onChange = (value, key, placement) => {
+    let data = {
+      PLACEMENT: placement,
+      HANDLER: `${window.origin}/index.php`
+    };
+    let path = "placement.unbind";
     if (value) {
-      handleBindPlacement(placement, key, window.origin)
-        .then(result => {
-          notify(result);
-          this.setState({ [key]: true });
-        })
-        .catch(err => {
-          notify(err);
-          this.setState({ [key]: this.setState[key] });
-        });
-    } else {
-      handleUnbindPlacement(placement, key, window.origin)
-        .then(result => {
-          notify(result);
-          this.setState({ [key]: true });
-        })
-        .catch(err => {
-          notify(err);
-          this.setState({ [key]: this.setState[key] });
-        });
+      data.TITLE = "Регистратура";
+      data.DESCRIPTION = "Тестовое приложение Регистратура";
+      path = "placement.bind";
     }
+    handlePlacement(path, data)
+      .then(() => {
+        notify(value ? "Элемент добавлен в меню!" : "Элемент удален из меню!");
+        this.setState({ [key]: value });
+      })
+      .catch(() => {
+        notify(
+          value
+            ? "Ошибка добавления элемента в меню!"
+            : "Ошибка удаления элемента из меню!"
+        );
+        this.setState({ [key]: this.setState[key] });
+      });
   };
 
-  handleUpdate = value => {
-    this.setState({ selectedUserId: value });
+  /**
+   * обновляет значение переменной состояния
+   * @param { string } key
+   * @param { string } value
+   * @return { void }
+   */
+  handleUpdate = (value, key) => {
+    this.setState({ [key]: value });
   };
 
   render() {
@@ -144,64 +176,23 @@ export default class App extends Component {
     return (
       <div style={{ padding: "1em" }}>
         <h2>Установка приложения.</h2>
-        <div style={{ marginBottom: "1em" }}>
-          <Switch
-            checked={leadContext}
-            onChange={checked =>
-              this.onChange(checked, "leadContext", "CRM_LEAD_LIST_MENU")
-            }
-          />{" "}
-          Добавить ссылку на приложение в контекстное меню лида.
-        </div>
-        <div style={{ marginBottom: "1em" }}>
-          <Switch
-            checked={leadCard}
-            onChange={checked =>
-              this.onChange(checked, "leadCard", "CRM_LEAD_DETAIL_TAB")
-            }
-          />{" "}
-          Добавить ссылку на приложение в карточку лида.
-        </div>
-        <div style={{ marginBottom: "1em" }}>
-          <Switch
-            checked={contactContext}
-            onChange={checked =>
-              this.onChange(checked, "contactContext", "CRM_CONTACT_LIST_MENU")
-            }
-          />{" "}
-          Добавить ссылку на приложение в контекстное меню контакта.
-        </div>
-        <div style={{ marginBottom: "1em" }}>
-          <Switch
-            checked={contactCard}
-            onChange={checked =>
-              this.onChange(checked, "contactCard", "CRM_CONTACT_DETAIL_TAB")
-            }
-          />{" "}
-          Добавить ссылку на приложение в карточку контакта.
-        </div>
-        <div style={{ marginBottom: "1em" }}>
-          <b>Администратор:</b>
-          <SelectComponent
-            update={this.handleUpdate}
-            users={users}
-            value={selectedUserId}
-          />
-        </div>
-        <div style={{ marginBottom: "1em" }}>
-          <b>SMS API KEY:</b>
-          <Input
-            value={smsApiKey}
-            onChange={e => this.setState({ smsApiKey: e.target.value })}
-          />
-        </div>
-        <div style={{ marginBottom: "1em" }}>
-          <b>SMS AUTH KEY:</b>
-          <Input
-            value={smsAuthKey}
-            onChange={e => this.setState({ smsAuthKey: e.target.value })}
-          />
-        </div>
+        <Switchers
+          contactCard={contactCard}
+          contactContext={contactContext}
+          leadCard={leadCard}
+          leadContext={leadContext}
+          onChange={this.onChange}
+        />
+        <SelectUser
+          update={this.handleUpdate}
+          users={users}
+          value={selectedUserId}
+        />
+        <InputSMS
+          apiKey={smsApiKey}
+          authKey={smsAuthKey}
+          update={this.handleUpdate}
+        />
         <Button type="primary" onClick={this.finishInstallation}>
           Завершить!
         </Button>
