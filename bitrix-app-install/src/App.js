@@ -1,8 +1,6 @@
 /* global BX24 window */
 import React, { Component } from "react";
-import Button from "antd/lib/button";
-import Input from "antd/lib/input";
-import Switch from "antd/lib/switch";
+import {Button, Input, Switch} from "antd";
 import {
   CONTACT_CARD,
   CONTACT_CONTEXT,
@@ -103,7 +101,7 @@ export default class App extends Component {
    */
   onChange = (value, key, placement) => {
     if (value) {
-      handleBindPlacement(placement, key, window.origin)
+      handleBindPlacement(placement, window.origin)
         .then(result => {
           notify(result);
           this.setState({ [key]: true });
@@ -113,10 +111,10 @@ export default class App extends Component {
           this.setState({ [key]: this.setState[key] });
         });
     } else {
-      handleUnbindPlacement(placement, key, window.origin)
+      handleUnbindPlacement(placement, window.origin)
         .then(result => {
           notify(result);
-          this.setState({ [key]: true });
+          this.setState({ [key]: false });
         })
         .catch(err => {
           notify(err);

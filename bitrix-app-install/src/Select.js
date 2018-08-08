@@ -1,6 +1,6 @@
 import React from "react";
 import { array, func, string } from "prop-types";
-import Select from "antd/lib/select";
+import { Select } from "antd";
 
 const Option = Select.Option;
 const STYLE = { width: "100%", marginRight: "0.5em" };

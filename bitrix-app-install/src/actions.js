@@ -1,5 +1,5 @@
 /* global BX24 window */
-import notification from "antd/lib/notification";
+import { notification } from "antd";
 
 export const notify = text => {
   return notification.open({
