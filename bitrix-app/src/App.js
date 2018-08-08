@@ -51,6 +51,8 @@ class App extends Component {
     selectedSpecialistId: "-select-",
     sections: [],
     showTable: false,
+    smsApiKey: "",
+    smsAuthKey: "",
     specialists: [],
     startDate: Moment()
       .startOf("week")
@@ -155,14 +157,13 @@ class App extends Component {
       this.state.patient.PATIENT_PHONE.VALUE !== " "
         ? this.state.patient.PATIENT_PHONE.VALUE.match(/\d/g).join("")
         : null;
-    if (number && message) {
+    if (number && message && this.state.smsApiKey && this.state.smsAuthKey) {
       axios
         .post(`/send-sms.php`, {
-          auth_key:
-            "32342ba3df54aa464c790d5ddb9fdbabedcaaa2369da98877d234895b8ff892f",
+          auth_key: this.state.smsAuthKey,
           number: number,
           message: message,
-          api_key: "6C26B34D-37ED-CB09-CEF5-1BE47677F3AD"
+          api_key: this.state.smsApiKey
         })
         .then(result => {
           if (result.status === 200) {
@@ -240,7 +241,9 @@ class App extends Component {
             administrator: {
               id: rawSettings[0].PROPERTY_VALUES.userAdministratorId,
               name: rawSettings[0].PROPERTY_VALUES.userAdministratorName
-            }
+            },
+            smsApiKey: rawSettings[0].PROPERTY_VALUES.smsApiKey,
+            smsAuthKey: rawSettings[0].PROPERTY_VALUES.smsAuthKey,
           });
         }
       }
@@ -541,18 +544,26 @@ class App extends Component {
       const communications = { ...this.state.patient.PATIENT_PHONE };
       communications.ENTITY_ID = this.state.leadId
         ? this.state.leadId
-        : this.state.contactId ? this.state.contactId : "0";
+        : this.state.contactId
+          ? this.state.contactId
+          : "0";
       communications.ENTITY_TYPE_ID = this.state.leadId
         ? "1"
-        : this.state.contactId ? "3" : "0";
+        : this.state.contactId
+          ? "3"
+          : "0";
       let newDeal = {
         COMMUNICATIONS: [communications],
         OWNER_ID: this.state.leadId
           ? this.state.leadId
-          : this.state.contactId ? this.state.contactId : "0",
+          : this.state.contactId
+            ? this.state.contactId
+            : "0",
         OWNER_TYPE_ID: this.state.leadId
           ? "1"
-          : this.state.contactId ? "3" : "0",
+          : this.state.contactId
+            ? "3"
+            : "0",
         TYPE_ID: "1",
         SUBJECT: product[0].NAME,
         START_TIME: Moment(this.state.eventStartTime).format(),
@@ -996,7 +1007,9 @@ class App extends Component {
         <Modal
           onCancel={() => this.setState({ visible: false })}
           onOk={() => this.handleCreateEvent()}
-          title={`Добавить событие на ${Moment(eventStartTime).format("DD.MM.YYYY")}`}
+          title={`Добавить событие на ${Moment(eventStartTime).format(
+            "DD.MM.YYYY"
+          )}`}
           visible={visible}
         >
           <div style={{ marginBottom: "5px" }}>
