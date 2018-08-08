@@ -1,11 +1,11 @@
 import React from "react";
 import { array, func, string } from "prop-types";
-import Select from "antd/lib/select";
+import { Select } from "antd";
 
 const Option = Select.Option;
 const STYLE = { width: "100%", marginRight: "0.5em" };
 
-export const SelectComponent = ({ update, users, value }) => {
+export const SelectUser = ({ update, users, value }) => {
   let userOptions = [
     <Option key="select-user" value="-select-">
       -выберите пользователя-
@@ -23,26 +23,29 @@ export const SelectComponent = ({ update, users, value }) => {
   }
 
   return (
-    <Select
-      defaultValue="-select-"
-      disabled={users.length ? false : true}
-      onChange={val => update(val)}
-      style={STYLE}
-      value={value}
-    >
-      {userOptions}
-    </Select>
+    <div style={{ marginBottom: "1em" }}>
+      <b>Администратор:</b>
+      <Select
+        defaultValue="-select-"
+        disabled={users.length ? false : true}
+        onChange={val => update(val, "selectedUserId")}
+        style={STYLE}
+        value={value}
+      >
+        {userOptions}
+      </Select>
+    </div>
   );
 };
 
-SelectComponent.propTypes = {
+SelectUser.propTypes = {
   update: func.isRequired,
   users: array.isRequired,
   value: string.isRequired
 };
 
-SelectComponent.defaultProps = {
-  update: () => {},
+SelectUser.defaultProps = {
+  update: () => console.log("Prop 'update' is not a Function!"),
   users: [],
   value: ""
 };
