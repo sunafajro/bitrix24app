@@ -2,8 +2,42 @@
 import React from "react";
 import Moment from "moment";
 import { Button, Icon, Popconfirm, Row, Tag } from "antd";
+import { Aux } from "../Utils";
 
-export const Aux = props => props.children;
+export const prepareTimeRange = () => {
+  let timerange = [];
+  for (let h = 15; h < 19; h++) {
+    for (let m = 0; m < 60; m = m + 5) {
+      timerange.push(h + ":" + (m < 10 ? "0" + m : m) + ":00");
+    }
+  }
+  return timerange;
+};
+/**
+ *
+ * @param {Object} info
+ */
+export const checkPlacement = info => {
+  let contactId = 0;
+  let leadId = 0;
+  let type = "";
+  if (info.hasOwnProperty("placement")) {
+    if (
+      info.placement === "CRM_LEAD_LIST_MENU" ||
+      info.placement === "CRM_LEAD_DETAIL_TAB"
+    ) {
+      leadId = info.options.ID;
+      type = "crm.lead.get";
+    } else if (
+      info.placement === "CRM_CONTACT_LIST_MENU" ||
+      info.placement === "CRM_CONTACT_DETAIL_TAB"
+    ) {
+      contactId = info.options.ID;
+      type = "crm.contact.get";
+    }
+  }
+  return { contactId, leadId, type };
+};
 
 const AddEventDiv = ({ date, handleShowModal }) => {
   return (
@@ -34,45 +68,46 @@ export const prepareCellEntries = (
   return (
     <Aux>
       <AddEventDiv date={Moment(cellDate)} handleShowModal={handleShowModal} />
-      {dataEvents.length ?
-        dataEvents.map(item => (
-          <div
-            className="app-event-class-name"
-            style={{
-              backgroundColor: item.COLOR,
-              fontSize: "12px"
-            }}
-            key={"user-event-" + item.ID}
-          >
-            <Row>
-              {`${item.DATE_FROM.substring(11, 16)} - ${item.DATE_TO.substring(
-                11,
-                16
-              )}`}
-              <br />
-              {item.NAME}
-              <br />
-              {item.PATIENT_NAME}
-              {item.isDeal ? (
-                <div style={{ position: "absolute", top: 0, right: 0 }}>
-                  <Popconfirm
-                    title="Вы уверены？"
-                    okText="Да"
-                    onConfirm={() => deleteEvent(item.ID)}
-                    cancelText="Нет"
-                  >
-                    <Button
-                      type="danger"
-                      size="small"
-                      shape="circle"
-                      icon="delete"
-                    />
-                  </Popconfirm>
-                </div>
-              ) : null}
-            </Row>
-          </div>
-        )) : null}
+      {dataEvents.length
+        ? dataEvents.map(item => (
+            <div
+              className="app-event-class-name"
+              style={{
+                backgroundColor: item.COLOR,
+                fontSize: "12px"
+              }}
+              key={"user-event-" + item.ID}
+            >
+              <Row>
+                {`${item.DATE_FROM.substring(
+                  11,
+                  16
+                )} - ${item.DATE_TO.substring(11, 16)}`}
+                <br />
+                {item.NAME}
+                <br />
+                {item.PATIENT_NAME}
+                {item.isDeal ? (
+                  <div style={{ position: "absolute", top: 0, right: 0 }}>
+                    <Popconfirm
+                      title="Вы уверены？"
+                      okText="Да"
+                      onConfirm={() => deleteEvent(item.ID)}
+                      cancelText="Нет"
+                    >
+                      <Button
+                        type="danger"
+                        size="small"
+                        shape="circle"
+                        icon="delete"
+                      />
+                    </Popconfirm>
+                  </div>
+                ) : null}
+              </Row>
+            </div>
+          ))
+        : null}
     </Aux>
   );
 };
@@ -155,7 +190,10 @@ export const prepareTableDataWithEvents = (
   /* формируем пул промисов для запроса данных пациента */
   const EventsPromises = items.map(item => {
     let type;
-    if (item.hasOwnProperty("OWNER_TYPE_ID") && (item.OWNER_TYPE_ID === 1 || item.OWNER_TYPE_ID === 3)) {
+    if (
+      item.hasOwnProperty("OWNER_TYPE_ID") &&
+      (item.OWNER_TYPE_ID === 1 || item.OWNER_TYPE_ID === 3)
+    ) {
       switch (item.OWNER_TYPE_ID) {
         /* встреча создана от лида */
         case "1":
