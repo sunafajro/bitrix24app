@@ -1,7 +1,10 @@
 /* global BX24 */
-import { isArrayNotEmpty } from "../Utils";
 
-export const getPlacementData = (contactId = 0, leadId = 0, type = 'crm.lead.get') => {
+export const getPlacementData = (
+  contactId = 0,
+  leadId = 0,
+  type = "crm.lead.get"
+) => {
   return new Promise((resolve, reject) => {
     BX24.callMethod(
       type,
@@ -44,7 +47,9 @@ export const getProductSectionList = () => {
         if (result.more()) {
           result.next();
         } else {
-          return resolve(isArrayNotEmpty(sections) ? sections : []);
+          return resolve(
+            Array.isArray(sections) && sections.length ? sections : []
+          );
         }
       }
     );
@@ -56,25 +61,83 @@ export const getProductSectionList = () => {
  * @param { string } sectionId
  * @return { Array }
  */
-export const getSectionProductList = (sectionId = null) => {
-  let criteria = {
-    order: { NAME: "ASC" },
-    select: ["ID", "NAME", "DESCRIPTION", "CURRENCY_ID", "PRICE"]
-  };
-  if (sectionId) {
-    criteria.filter = { SECTION_ID: sectionId };
-  }
-  let products = [];
-  /* Возвращает список товаров по фильтру. */
+export const getSectionProductList = (sectionId = "") => {
   return new Promise((resolve, reject) => {
+    let criteria = {
+      order: { NAME: "ASC" },
+      select: ["ID", "NAME", "DESCRIPTION", "CURRENCY_ID", "PRICE"]
+    };
+    if (sectionId !== "") {
+      criteria.filter = { SECTION_ID: sectionId };
+    }
+    let products = [];
+    /* Возвращает список товаров по фильтру. */
     BX24.callMethod("crm.product.list", criteria, result => {
       if (result.error()) return reject();
       products = products.concat(result.data());
       if (result.more()) {
         result.next();
       } else {
-        this.setState({ products });
+        return resolve(
+          Array.isArray(products) && products.length ? products : []
+        );
       }
+    });
+  });
+};
+
+/* Возвращает описание полей товара. */
+export const getProductFields = () => {
+  return new Promise((resolve, reject) => {
+    BX24.callMethod("crm.product.fields", {}, result => {
+      if (result.error()) reject();
+      const rawProductFields = result.data();
+      let specialistProp = "";
+      let durationProp = "";
+      Object.keys(rawProductFields).forEach(field => {
+        /* ищем то в которое связывает услугу с исполнителем */
+        if (
+          rawProductFields[field].propertyType === "S" &&
+          rawProductFields[field].title === "Специалист" &&
+          rawProductFields[field].type === "product_property" &&
+          rawProductFields[field].userType === "employee"
+        ) {
+          specialistProp = field;
+        }
+        /* ищем то в котором указана продолжительность услуги */
+        if (
+          rawProductFields[field].propertyType === "N" &&
+          rawProductFields[field].title === "Время, минут" &&
+          rawProductFields[field].type === "product_property" &&
+          rawProductFields[field].userType === ""
+        ) {
+          durationProp = field;
+        }
+      });
+      return resolve({ specialistProp, durationProp });
+    });
+  });
+};
+
+export const getSpecialistsByProduct = (durationProp, specialistProp, val) => {
+  return new Promise((resolve, reject) => {
+    /* Возвращает товар по идентификатору. */
+    BX24.callMethod("crm.product.get", { ID: val }, result => {
+      if (result.error()) reject();
+      const rawProductData = result.data();
+      const duration =
+        rawProductData.hasOwnProperty("durationProp") &&
+        rawProductData[durationProp].value
+          ? rawProductData[durationProp].value
+          : null;
+      let specialists = [];
+      if (rawProductData && rawProductData[specialistProp]) {
+        /* наполняем массив с id специалистов связанных с услугой */
+        rawProductData[specialistProp].forEach(specialist => {
+          specialists.push(specialist.value);
+        });
+      }
+      return { duration, specialists };
     });
   });
 };

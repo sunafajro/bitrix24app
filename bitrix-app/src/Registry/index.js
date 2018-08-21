@@ -11,22 +11,28 @@ import {
   Modal,
   notification,
   Row,
-  Select,
   Table,
   TimePicker
 } from "antd";
-import { getPlacementData, getProductSectionList, getSectionProductList } from "./Actions";
-import { Aux, isArrayNotEmpty, notify } from "../Utils";
+import {
+  getPlacementData,
+  getProductFields,
+  getProductSectionList,
+  getSectionProductList,
+  getSpecialistsByProduct
+} from "./Actions";
+import { Aux, convertArrayToObject, notify } from "../Utils";
 import { DISABLED_HOURS } from "./defaults";
 import {
-  prepareTimeRange,
   prepareSpecialistByProduct,
+  prepareTimeRange,
   prepareTableColumns,
   prepareTableDataWithEvents
 } from "./PrepareFunctions";
 import { checkPlacement } from "./PrepareFunctions";
-
-const Option = Select.Option;
+import { SelectSection } from "./SelectSection";
+import { SelectProduct } from "./SelectProduct";
+import { SelectSpecialist } from "./SelectSpecialist";
 
 export default class Registry extends Component {
   static propTypes = {
@@ -107,14 +113,14 @@ export default class Registry extends Component {
   getSectionsOrProducts = state => {
     return getProductSectionList()
       .then(sections => {
-        if (isArrayNotEmpty(sections)) {
+        if (Array.isArray(sections) && sections.length) {
           state.sections = [...sections];
           this.setState(state);
         } else {
           notify("Список разделов услуг пуст!");
           getSectionProductList()
             .then(products => {
-              if (isArrayNotEmpty(products)) {
+              if (Array.isArray(products) && products.lengtр) {
                 state.products = [...products];
               } else {
                 notify("Список услуг пуст!");
@@ -190,14 +196,28 @@ export default class Registry extends Component {
    * вызвается при выборе раздела товаров
    */
   handleSectionSelect = val => {
-    this.getSectionProductList(val);
-    this.setState({
-      events: [],
-      selectedSectionId: val,
-      selectedProductId: "-select-",
-      selectedSpecialistId: "-select-",
-      specialists: []
-    });
+    return getSectionProductList(val)
+      .then(products => {
+        this.setState({
+          events: [],
+          products,
+          selectedSectionId: val,
+          selectedProductId: "-select-",
+          selectedSpecialistId: "-select-",
+          specialists: []
+        });
+      })
+      .catch(err => {
+        notify("Ошибка получения списка услуг!");
+        this.setState({
+          events: [],
+          products: [],
+          selectedSectionId: val,
+          selectedProductId: "-select-",
+          selectedSpecialistId: "-select-",
+          specialists: []
+        });
+      });
   };
 
   /**
@@ -205,109 +225,69 @@ export default class Registry extends Component {
    * вызвается при выборе раздела товаров
    */
   handleProductSelect = val => {
-    /* Возвращает описание полей товара. */
-    BX24.callMethod("crm.product.fields", {}, result => {
-      if (result.error()) {
-        notification.open({
-          duration: 2,
-          description: "Ошибка получения списка свойств услуг!"
-        });
-      } else {
-        const rawProductFields = result.data();
-        let specialistProp = "";
-        let durationProp = "";
-        Object.keys(rawProductFields).forEach(field => {
-          /* ищем то в которое связывает услугу с исполнителем */
-          if (
-            rawProductFields[field].propertyType === "S" &&
-            rawProductFields[field].title === "Специалист" &&
-            rawProductFields[field].type === "product_property" &&
-            rawProductFields[field].userType === "employee"
-          ) {
-            specialistProp = field;
-          }
-          /* ищем то в котором указана продолжительность услуги */
-          if (
-            rawProductFields[field].propertyType === "N" &&
-            rawProductFields[field].title === "Время, минут" &&
-            rawProductFields[field].type === "product_property" &&
-            rawProductFields[field].userType === ""
-          ) {
-            durationProp = field;
-          }
-        });
-        if (specialistProp && durationProp) {
-          /* Возвращает товар по идентификатору. */
-          BX24.callMethod("crm.product.get", { ID: val }, result => {
-            if (result.error()) {
-              notification.open({
-                duration: 2,
-                description: "Ошибка получения свойств выбранной услуги!"
-              });
-            } else {
-              const rawProductData = result.data();
-              const duration =
-                rawProductData.hasOwnProperty("durationProp") &&
-                rawProductData[durationProp].value
-                  ? rawProductData[durationProp].value
-                  : null;
-              let specialists = [];
-              if (rawProductData && rawProductData[specialistProp]) {
-                /* наполняем массив с id специалистов связанных с услугой */
-                rawProductData[specialistProp].forEach(specialist => {
-                  specialists.push(specialist.value);
-                });
-              }
-              if (specialists.length && duration) {
-                this.setState({
-                  duration,
-                  specialists: prepareSpecialistByProduct(
-                    this.state.users,
-                    specialists
-                  )
-                });
-              } else if (!specialists.length && duration) {
-                notification.open({
-                  duration: 2,
-                  description: "У услуги отсутсвует «Специалист»!"
-                });
-                this.setState({
-                  duration
-                });
-              } else if (specialists.length && !duration) {
-                notification.open({
-                  duration: 2,
-                  description: "У услуги отсутсвует «Продолжительность»!"
-                });
-                this.setState({
-                  specialists: prepareSpecialistByProduct(
-                    this.state.users,
-                    specialists
-                  )
-                });
-              } else {
-                notification.open({
-                  duration: 2,
-                  description:
-                    "У услуги отсутсвуют «Специалист» и «Продолжительность»!"
-                });
-              }
-            }
-          });
-        } else {
-          notification.open({
-            duration: 2,
-            description:
-              "Поля «Специалист» или «Продолжительность» в списке полей услуги не найдено!"
-          });
-        }
-      }
-    });
-    this.setState({
+    const state = {
       events: [],
       selectedProductId: val,
-      selectedSpecialistId: "-select-"
-    });
+      selectedSpecialistId: "-select-",
+      specialists: []
+    };
+    return getProductFields()
+      .then(({ durationProp, specialistProp }) => {
+        if (specialistProp && durationProp) {
+          return getSpecialistsByProduct(durationProp, specialistProp, val)
+            .then(({ duration, specialists }) => {
+              if (
+                Array.isArray(specialists) &&
+                specialists.length &&
+                duration
+              ) {
+                state.duration = duration;
+                state.specialists = prepareSpecialistByProduct(
+                  this.state.users,
+                  specialists
+                );
+                this.setState(state);
+              } else if (
+                Array.isArray(specialists) &&
+                !specialists.length &&
+                duration
+              ) {
+                notify("У услуги отсутсвует «Специалист»!");
+                state.duration = duration;
+                this.setState(state);
+              } else if (
+                Array.isArray(specialists) &&
+                specialists.length &&
+                !duration
+              ) {
+                notify("У услуги отсутсвует «Продолжительность»!");
+                state.specialists = prepareSpecialistByProduct(
+                  this.state.users,
+                  specialists
+                );
+                this.setState(state);
+              } else {
+                notify(
+                  "У услуги отсутсвуют «Специалист» и «Продолжительность»!"
+                );
+                this.setState(state);
+              }
+            })
+            .catch(err => {
+              notify("Ошибка получения свойств выбранной услуги!");
+              this.setState(state);
+            });
+        } else {
+          notify(
+            "Поля «Специалист» или «Продолжительность» в списке полей услуги не найдено!"
+          );
+          this.setState(state);
+        }
+      })
+      .catch(err => {
+        notify("Ошибка получения списка свойств услуг!");
+        this.setState(state);
+      });
   };
 
   /**
@@ -660,134 +640,33 @@ export default class Registry extends Component {
       hideOnSinglePage: true,
       pageSize: 12
     };
-    let productList = {};
-    let specialistList = {};
+    let productList = convertArrayToObject(products);
+    let specialistList = convertArrayToObject(specialists);
 
-    let sectionOptions = [
-      <Option key="select-section" value="-select-" disabled>
-        -выберите категорию-
-      </Option>
-    ];
-    if (sections.length) {
-      sections.forEach(section => {
-        sectionOptions.push(
-          <Option key={"opt-" + section.ID} value={section.ID}>
-            {section.NAME}
-          </Option>
-        );
-      });
-    }
-    const SECTIONS = (
-      <Select
-        defaultValue="-select-"
-        disabled={sections.length ? false : true}
-        onChange={val => this.handleSectionSelect(val)}
-        size="small"
-        style={{ width: "100%", marginRight: "0.5em" }}
-        value={selectedSectionId}
-      >
-        {sectionOptions}
-      </Select>
-    );
-
-    let productOptions = [
-      <Option key="select-product" value="-select-" disabled>
-        -выберите категорию-
-      </Option>
-    ];
-    if (products.length) {
-      products.forEach(product => {
-        productOptions.push(
-          <Option
-            key={"opt-" + product.ID}
-            title={product.NAME}
-            value={product.ID}
-          >
-            {product.NAME}
-          </Option>
-        );
-        productList[product.ID] = product.NAME;
-      });
-    }
-    const PRODUCTS = (
-      <Select
-        defaultValue="-select-"
-        disabled={products.length ? false : true}
-        onChange={val => this.handleProductSelect(val)}
-        size="small"
-        style={{ width: "100%", marginRight: "0.5em" }}
-        value={selectedProductId}
-      >
-        {productOptions}
-      </Select>
-    );
-
-    let specialistOptions = [
-      <Option key="select-specialist" value="-select-" disabled>
-        -выберите специалиста-
-      </Option>
-    ];
-    if (specialists.length) {
-      specialists.forEach(specialist => {
-        specialistOptions.push(
-          <Option key={"opt-" + specialist.ID} value={specialist.ID}>
-            {specialist.NAME}
-          </Option>
-        );
-        specialistList[specialist.ID] = specialist.NAME;
-      });
-    }
-    const SPECIALISTS = (
-      <Select
-        defaultValue="-select-"
-        disabled={specialists.length ? false : true}
-        onChange={val => this.handleSpecialistSelect(val, startDate, endDate)}
-        size="small"
-        style={{ width: "100%", marginRight: "0.5em" }}
-        value={selectedSpecialistId}
-      >
-        {specialistOptions}
-      </Select>
-    );
-
+    console.log("count of sections: ", sections.length);
+    console.log("count of products: ", products.length);
     return (
       <div style={{ padding: "5px", marginBottom: "1em" }}>
         <Row>
-          <Col
-            xs={{ span: 24 }}
-            sm={{ span: 24 }}
-            md={{ span: 8 }}
-            lg={{ span: 8 }}
-            xl={{ span: 8 }}
-            xxl={{ span: 8 }}
-            style={{ paddingRight: "5px", marginBottom: "0.5em" }}
-          >
-            {SECTIONS}
-          </Col>
-          <Col
-            xs={{ span: 24 }}
-            sm={{ span: 24 }}
-            md={{ span: 16 }}
-            lg={{ span: 16 }}
-            xl={{ span: 16 }}
-            xxl={{ span: 16 }}
-            style={{ paddingRight: "5px", marginBottom: "0.5em" }}
-          >
-            {PRODUCTS}
-          </Col>
+          <SelectSection
+            handleSectionSelect={this.handleSectionSelect}
+            sections={sections}
+            selectedSectionId={selectedSectionId}
+          />
+          <SelectProduct
+            handleProductSelect={this.handleProductSelect}
+            specialists={specialists}
+            selectedProductId={selectedProductId}
+          />
         </Row>
         <Row>
-          <Col
-            xs={{ span: 24 }}
-            sm={{ span: 24 }}
-            md={{ span: 8 }}
-            lg={{ span: 8 }}
-            xl={{ span: 8 }}
-            xxl={{ span: 8 }}
-            style={{ paddingRight: "5px", marginBottom: "0.5em" }}
-          >
-            {SPECIALISTS}
-          </Col>
+          <SelectSpecialist
+            endDate={endDate}
+            handleSpecialistSelect={this.handleSpecialistSelect}
+            products={products}
+            selectedSpecialistId={selectedSpecialistId}
+            startDate={startDate}
+          />
           <Col
             xs={{ span: 24 }}
             sm={{ span: 24 }}
