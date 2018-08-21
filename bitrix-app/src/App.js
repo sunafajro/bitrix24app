@@ -2,7 +2,7 @@ import React, { Component } from "react";
 import { appInit, getAppParams, getUsers } from "./Actions";
 import Registry from "./Registry";
 import Settings from "./Settings";
-import { Aux, isArrayNotEmpty, notify } from "./Utils";
+import { Aux, notify } from "./Utils";
 
 export default class App extends Component {
   state = {
@@ -21,7 +21,7 @@ export default class App extends Component {
           getUsers()
             .then(users => {
               params.users = [...users];
-              if (isArrayNotEmpty(users))
+              if (Array.isArray(users) && users.length)
                 notify("Не найдено ни одного пользователя!");
               this.setState({ params });
             })

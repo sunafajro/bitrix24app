@@ -1,5 +1,4 @@
 /* global BX24 */
-import { isArrayNotEmpty } from "../Utils";
 
 export const appInit = () => {
   return new Promise((resolve, reject) => {
@@ -14,7 +13,8 @@ export const getAppParams = () => {
       if (result.error()) return reject();
       const rawSettings = result.data();
       if (
-        isArrayNotEmpty(rawSettings) &&
+        Array.isArray(rawSettings) &&
+        rawSettings.length &&
         rawSettings[0].hasOwnProperty("PROPERTY_VALUES")
       ) {
         const propVal = rawSettings[0].PROPERTY_VALUES;
@@ -51,7 +51,7 @@ export const getUsers = () => {
           };
         });
       }
-      return resolve(isArrayNotEmpty(users) ? users : []);
+      return resolve(Array.isArray(users) && users.length ? users : []);
     });
   });
 };
