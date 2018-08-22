@@ -11,6 +11,7 @@ import {
   Modal,
   notification,
   Row,
+  Spin,
   Table,
   TimePicker
 } from "antd";
@@ -19,6 +20,8 @@ import {
   getProductFields,
   getProductSectionList,
   getSectionProductList,
+  getSpecialistCalendarEvents,
+  getSpecialistDeals,
   getSpecialistsByProduct
 } from "./Actions";
 import { Aux, convertArrayToObject, notify } from "../Utils";
@@ -51,6 +54,7 @@ export default class Registry extends Component {
     eventStartTime: Moment(),
     eventEndTime: Moment(),
     fetchServices: false,
+    initLoading: true,
     leadId: 0,
     loading: false,
     patient: {
@@ -90,6 +94,7 @@ export default class Registry extends Component {
     const { contactId, leadId, type } = checkPlacement(placementInfo);
     const state = {
       administrator: { ...administrator },
+      initLoading: false,
       smsKeys: { ...smsKeys },
       tableColumns: prepareTableColumns(startDate, currentDate),
       timerange: prepareTimeRange(),
@@ -101,7 +106,8 @@ export default class Registry extends Component {
           state.patient = { ...patient };
           this.getSectionsOrProducts(state);
         })
-        .catch(() => {
+        .catch(err => {
+          console.log("error::componentDidMount::getPlacementData", err);
           notify("Ошибка получения идентификатора пациента!");
           this.getSectionsOrProducts(state);
         });
@@ -127,13 +133,18 @@ export default class Registry extends Component {
               }
               this.setState(state);
             })
-            .catch(() => {
+            .catch(err => {
+              console.log(
+                "error::getSectionsOrProducts::getProductSectionList::getSectionProductList",
+                err
+              );
               notify("Ошибка получения списка услуг!");
               this.setState(state);
             });
         }
       })
-      .catch(() => {
+      .catch(err => {
+        console.log("error::getSectionsOrProducts::getProductSectionList", err);
         notify("Ошибка получения списка разделов услуг!");
         this.setState(state);
       });
@@ -196,36 +207,34 @@ export default class Registry extends Component {
    * вызвается при выборе раздела товаров
    */
   handleSectionSelect = val => {
+    const state = {
+      events: [],
+      products: [],
+      selectedSectionId: val,
+      selectedProductId: "-select-",
+      selectedSpecialistId: "-select-",
+      specialists: []
+    };
     return getSectionProductList(val)
       .then(products => {
-        this.setState({
-          events: [],
-          products,
-          selectedSectionId: val,
-          selectedProductId: "-select-",
-          selectedSpecialistId: "-select-",
-          specialists: []
-        });
+        state.products = [...products];
+        this.setState(state);
       })
       .catch(err => {
+        console.log("error::handleSectionSelect::getSectionProductList", err);
         notify("Ошибка получения списка услуг!");
-        this.setState({
-          events: [],
-          products: [],
-          selectedSectionId: val,
-          selectedProductId: "-select-",
-          selectedSpecialistId: "-select-",
-          specialists: []
-        });
+        this.setState(state);
       });
   };
 
   /**
+   * запрашивает список специалистов и продолжительность выбранной услуги
    * @param {string} val
-   * вызвается при выборе раздела товаров
+   * @returns {void}
    */
   handleProductSelect = val => {
     const state = {
+      duration: "",
       events: [],
       selectedProductId: val,
       selectedSpecialistId: "-select-",
@@ -274,6 +283,10 @@ export default class Registry extends Component {
               }
             })
             .catch(err => {
+              console.log(
+                "error::handleProductSelect::getProductFields::getSpecialistsByProduct",
+                err
+              );
               notify("Ошибка получения свойств выбранной услуги!");
               this.setState(state);
             });
@@ -285,103 +298,96 @@ export default class Registry extends Component {
         }
       })
       .catch(err => {
+        console.log("error::handleProductSelect::getProductFields", err);
         notify("Ошибка получения списка свойств услуг!");
         this.setState(state);
       });
   };
 
   /**
+   * вызвается при выборе специалиста
    * @param {string} id
    * @param {string} startDate
    * @param {string} endDate
-   * вызвается при выборе специалиста
+   * @returns {void}
    */
   handleSpecialistSelect = (id, startDate, endDate) => {
-    this.setState({
-      loading: true
-    });
-    /* получаем список событий календаря. */
-    BX24.callMethod(
-      "calendar.event.get",
-      {
-        type: "user",
-        ownerId: id,
-        from: startDate,
-        to: endDate
-      },
-      result => {
-        if (result.error()) {
-          notification.open({
-            duration: 2,
-            description: "Ошибка получения календаря событий специалиста!"
-          });
-        } else {
-          let events = result.data();
-          let deals = [];
-          /* Получаем список "дел" пользователя */
-          BX24.callMethod(
-            "crm.activity.list",
-            {
-              filter: {
-                //OWNER_TYPE_ID
-                RESPONSIBLE_ID: id,
-                ">=START_TIME": Moment(startDate).format(),
-                "<=END_TIME": Moment(endDate).format()
-              }
-            },
-            result => {
-              deals = deals.concat(result.data());
-              if (result.more()) {
-                result.next();
-              } else {
-                let items = [];
-                if (events.length && deals.length) {
-                  deals.forEach(deal => {
-                    events = events.filter(event => {
-                      return (
-                        !Moment(Moment.utc(deal.START_TIME)).isSame(
-                          Moment(event.DATE_FROM, "DD.MM.YYYY HH:mm:ss")
-                        ) &&
-                        !Moment(Moment.utc(deal.END_TIME)).isSame(
-                          Moment(event.DATE_TO, "DD.MM.YYYY HH:mm:ss")
-                        )
-                      );
-                    });
-                  });
-                  items = [...events, ...deals];
-                } else if (events.length && !deals.length) {
-                  items = [...events];
-                } else if (!events.length && deals.length) {
-                  items = [...deals];
-                }
-                prepareTableDataWithEvents(
-                  this.deleteEvent,
-                  this.handleShowModal,
-                  items,
-                  this.state.startDate,
-                  (err, result) => {
-                    if (err) {
-                      notification.open({
-                        duration: 2,
-                        description:
-                          "Ошибка получения событий календаря пользователя!"
-                      });
-                    } else {
-                      this.setState({
-                        loading: false,
-                        events: items,
-                        selectedSpecialistId: id,
-                        tableData: result
-                      });
-                    }
-                  }
-                );
-              }
+    // this.setState({
+    //   loading: true
+    // });
+    const state = {
+      // loading: false,
+      events: [],
+      selectedSpecialistId: id,
+      tableData: []
+    };
+    return getSpecialistCalendarEvents(id, startDate, endDate)
+      .then(events => {
+        return getSpecialistDeals(id, startDate, endDate)
+          .then(deals => {
+            let items = [];
+            if (
+              Array.isArray(events) &&
+              events.length &&
+              Array.isArray(deals) &&
+              deals.length
+            ) {
+              deals.forEach(deal => {
+                events = events.filter(event => {
+                  return (
+                    !Moment(Moment.utc(deal.START_TIME)).isSame(
+                      Moment(event.DATE_FROM, "DD.MM.YYYY HH:mm:ss")
+                    ) &&
+                    !Moment(Moment.utc(deal.END_TIME)).isSame(
+                      Moment(event.DATE_TO, "DD.MM.YYYY HH:mm:ss")
+                    )
+                  );
+                });
+              });
+              items = [...events, ...deals];
+            } else if (events.length && !deals.length) {
+              items = [...events];
+            } else if (!events.length && deals.length) {
+              items = [...deals];
             }
-          );
-        }
-      }
-    );
+            prepareTableDataWithEvents(
+              this.deleteEvent,
+              this.handleShowModal,
+              items,
+              this.state.startDate,
+              (err, result) => {
+                if (err) {
+                  console.log(
+                    "error::handleSpecialistSelect::getSpecialistCalendarEvents::getSpecialistDeals",
+                    err
+                  );
+                  notify("Ошибка получения событий календаря пользователя!");
+                } else {
+                  //state.loading = false;
+                  state.events = [...items];
+                  state.tableData = [...result];
+                }
+                this.setState(state);
+              }
+            );
+          })
+          .catch(err => {
+            console.log(
+              "error::handleSpecialistSelect::getSpecialistCalendarEvents::getSpecialistDeals",
+              err
+            );
+            notify("Ошибка получения дел специалиста!");
+            this.setState(state);
+          });
+      })
+      .catch(err => {
+        console.log(
+          "error::handleSpecialistSelect::getSpecialistCalendarEvents",
+          err
+        );
+        notify("Ошибка получения событий из календаря специалиста!");
+        this.setState(state);
+      });
   };
 
   handleShowModal = date => {
@@ -621,6 +627,7 @@ export default class Registry extends Component {
       endDate,
       eventStartTime,
       eventEndTime,
+      initLoading,
       loading,
       patient,
       products,
@@ -635,6 +642,10 @@ export default class Registry extends Component {
       visible
     } = this.state;
 
+    if (initLoading) {
+      return <Spin />;
+    }
+    console.log(this.state);
     const timeFormat = "HH:mm";
     const pagination = {
       hideOnSinglePage: true,
@@ -643,8 +654,6 @@ export default class Registry extends Component {
     let productList = convertArrayToObject(products);
     let specialistList = convertArrayToObject(specialists);
 
-    console.log("count of sections: ", sections.length);
-    console.log("count of products: ", products.length);
     return (
       <div style={{ padding: "5px", marginBottom: "1em" }}>
         <Row>
@@ -655,7 +664,7 @@ export default class Registry extends Component {
           />
           <SelectProduct
             handleProductSelect={this.handleProductSelect}
-            specialists={specialists}
+            products={products}
             selectedProductId={selectedProductId}
           />
         </Row>
@@ -663,8 +672,8 @@ export default class Registry extends Component {
           <SelectSpecialist
             endDate={endDate}
             handleSpecialistSelect={this.handleSpecialistSelect}
-            products={products}
             selectedSpecialistId={selectedSpecialistId}
+            specialists={specialists}
             startDate={startDate}
           />
           <Col
