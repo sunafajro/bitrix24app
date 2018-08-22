@@ -1,4 +1,7 @@
 import React, { Component } from "react";
+import { cloneDeep } from "lodash";
+import { Spin } from "antd";
+import { defaultParams } from "./defaults.js";
 import { appInit, getAppParams, getUsers } from "./Actions";
 import Registry from "./Registry";
 import Settings from "./Settings";
@@ -7,11 +10,8 @@ import { Aux, notify } from "./Utils";
 export default class App extends Component {
   state = {
     current: "registry",
-    params: {
-      administrator: {},
-      smsKeys: {},
-      users: []
-    }
+    loading: true,
+    params: cloneDeep(defaultParams)
   };
 
   componentDidMount() {
@@ -20,10 +20,12 @@ export default class App extends Component {
         .then(params => {
           getUsers()
             .then(users => {
-              params.users = [...users];
-              if (Array.isArray(users) && users.length)
+              if (Array.isArray(users) && users.length) {
+                params.users = cloneDeep(users);
+              } else {
                 notify("Не найдено ни одного пользователя!");
-              this.setState({ params });
+              }
+              this.setState({ loading: false, params });
             })
             .catch(() => notify("Ошибка получения пользователей!"));
         })
@@ -36,7 +38,10 @@ export default class App extends Component {
   };
 
   render() {
-    const { current, params } = this.state;
+    const { current, loading, params } = this.state;
+    if (loading) {
+      return <Spin />;
+    }
     return (
       <Aux>
         {current === "registry" ? (
