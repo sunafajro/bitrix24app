@@ -1,11 +1,15 @@
+export const administrator = {
+  id: 0,
+  name: ""
+};
+
+export const smsKeys = {
+  smsApiKey: "",
+  smsAuthKey: ""
+};
+
 export const defaultParams = {
-  administrator: {
-    id: 0,
-    name: ""
-  },
-  smsKeys: {
-    smsApiKey: "",
-    smsAuthKey: ""
-  },
+  administrator: { ...administrator },
+  smsKeys: { ...smsKeys },
   users: []
 };
