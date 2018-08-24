@@ -15,23 +15,25 @@ export default class App extends Component {
   };
 
   componentDidMount() {
-    appInit().then(() => {
-      getAppParams()
-        .then(params => {
-          getUsers()
-            .then(users => {
-              if (Array.isArray(users) && users.length) {
-                params.users = cloneDeep(users);
-              } else {
-                notify("Не найдено ни одного пользователя!");
-              }
-              this.setState({ loading: false, params });
-            })
-            .catch(() => notify("Ошибка получения пользователей!"));
-        })
-        .catch(() => notify("Ошибка получения параметров приложения!"));
-    });
+    this.startApp();
   }
+
+  startApp = async () => {
+    await appInit();
+    try {
+      const startData = await Promise.all([getAppParams(), getUsers()]);
+      const params = startData[0] ? startData[0] : cloneDeep(defaultParams);
+      if (Array.isArray(startData[1]) && startData[1].length) {
+        params.users = cloneDeep(startData[1]);
+      } else {
+        notify("Не найдено ни одного пользователя!");
+      }
+      this.setState({ loading: false, params });
+    } catch (e) {
+      notify("Ошибка получения первоначальных параметров приложения!");
+      console.log(e);
+    }
+  };
 
   switchMode = current => {
     this.setState({ current });

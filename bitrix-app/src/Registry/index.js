@@ -1,6 +1,7 @@
 /* global BX24 */
 import React, { Component } from "react";
 import { func, object } from "prop-types";
+import { cloneDeep } from "lodash";
 import Moment from "moment";
 import axios from "axios";
 import {
@@ -25,7 +26,7 @@ import {
   getSpecialistsByProduct
 } from "./Actions";
 import { Aux, convertArrayToObject, notify } from "../Utils";
-import { DISABLED_HOURS } from "./defaults";
+import { defaultState, DISABLED_HOURS } from "./defaults";
 import {
   prepareSpecialistByProduct,
   prepareTimeRange,
@@ -42,52 +43,14 @@ export default class Registry extends Component {
     params: object.isRequired,
     switchMode: func.isRequired
   };
-  state = {
-    administrator: {
-      id: 0,
-      name: ""
-    },
-    contactId: 0,
-    currentDate: Moment().format("YYYY-MM-DD"),
-    duration: "",
-    events: [],
-    eventStartTime: Moment(),
-    eventEndTime: Moment(),
-    fetchServices: false,
-    initLoading: true,
-    leadId: 0,
-    loading: false,
-    patient: {
-      PATIENT_NAME: "",
-      PATIENT_TYPE: "",
-      PATIENT_ID: 0,
-      PATIENT_PHONE: { VALUE: " " }
-    },
-    products: [],
-    selectedProductId: "-select-",
-    selectedSectionId: "-select-",
-    selectedSpecialistId: "-select-",
-    sections: [],
-    showTable: false,
-    smsKeys: {
-      smsApiKey: "",
-      smsAuthKey: ""
-    },
-    specialists: [],
-    startDate: Moment()
-      .startOf("week")
-      .format("YYYY-MM-DD"),
-    endDate: Moment()
-      .endOf("week")
-      .format("YYYY-MM-DD"),
-    tableColumns: [],
-    tableData: [],
-    timerange: [],
-    users: [],
-    visible: false
-  };
+
+  state = cloneDeep(defaultState);
 
   componentDidMount() {
+    this.startRegistry();
+  }
+
+  startRegistry = async () => {
     const { startDate, currentDate } = this.state;
     const { administrator, smsKeys, users } = this.props.params;
     const placementInfo = BX24.placement.info();
@@ -101,53 +64,57 @@ export default class Registry extends Component {
       users: [...users]
     };
     if (type) {
-      getPlacementData(contactId, leadId, type)
-        .then(patient => {
-          state.patient = { ...patient };
-          this.getSectionsOrProducts(state);
-        })
-        .catch(err => {
-          console.log("error::componentDidMount::getPlacementData", err);
-          notify("Ошибка получения идентификатора пациента!");
-          this.getSectionsOrProducts(state);
-        });
-    } else {
-      this.getSectionsOrProducts(state);
+      try {
+        const patient = await getPlacementData(contactId, leadId, type);
+        state.patient = cloneDeep(patient);
+      } catch (e) {
+        notify("Ошибка при получении контактных данных пациента!");
+        console.log("startRegistry::getPlacementData", e);
+      }
+    }
+    try {
+      const { products, sections } = await this.getSectionsOrProducts(state);
+      state.sections = cloneDeep(sections);
+      state.products = cloneDeep(products);
+      this.setState(state);
+    } catch (e) {
+      notify("Ошибка получения списка разделов или услуг!");
+      console.log("startRegistry::getSectionsOrProducts", e);
+      this.setState(state);
     }
   }
 
-  getSectionsOrProducts = state => {
-    return getProductSectionList()
-      .then(sections => {
-        if (Array.isArray(sections) && sections.length) {
-          state.sections = [...sections];
-          this.setState(state);
-        } else {
-          notify("Список разделов услуг пуст!");
-          getSectionProductList()
-            .then(products => {
-              if (Array.isArray(products) && products.lengtр) {
-                state.products = [...products];
-              } else {
-                notify("Список услуг пуст!");
-              }
-              this.setState(state);
-            })
-            .catch(err => {
-              console.log(
-                "error::getSectionsOrProducts::getProductSectionList::getSectionProductList",
-                err
-              );
-              notify("Ошибка получения списка услуг!");
-              this.setState(state);
-            });
+  /**
+   * Получает список разделов или услуг
+   * @param {Object} state
+   * @returns {Object}
+   */
+  getSectionsOrProducts = async state => {
+    try {
+      const sections = await getProductSectionList();
+      if (Array.isArray(sections) && sections.length) {
+        return { sections, products: []}
+      } else {
+        notify("Список разделов услуг пуст!");
+        try {
+          const products = await getSectionProductList();
+          if (Array.isArray(products) && products.lengtр) {
+            return { products, sections: [] };
+          } else {
+            notify("Список услуг пуст!");
+            return {products: [], sections: []};
+          }
+        } catch (e) {
+          notify("Ошибка получения списка услуг!");
+          console.log("getSectionsOrProducts::getSectionProductList", e);
+          return {products: [], sections: []};
         }
-      })
-      .catch(err => {
-        console.log("error::getSectionsOrProducts::getProductSectionList", err);
-        notify("Ошибка получения списка разделов услуг!");
-        this.setState(state);
-      });
+      }
+    } catch (e) {
+      notify("Ошибка получения списка разделов!");
+      console.log("getSectionsOrProducts::getProductSectionList", e);
+      return {products: [], sections: []};
+    }
   };
 
   sendSms = () => {
@@ -206,7 +173,7 @@ export default class Registry extends Component {
    * @param {string} val
    * вызвается при выборе раздела товаров
    */
-  handleSectionSelect = val => {
+  handleSectionSelect = async val => {
     const state = {
       events: [],
       products: [],
@@ -215,16 +182,15 @@ export default class Registry extends Component {
       selectedSpecialistId: "-select-",
       specialists: []
     };
-    return getSectionProductList(val)
-      .then(products => {
-        state.products = [...products];
-        this.setState(state);
-      })
-      .catch(err => {
-        console.log("error::handleSectionSelect::getSectionProductList", err);
-        notify("Ошибка получения списка услуг!");
-        this.setState(state);
-      });
+    try {
+      const products = await getSectionProductList(val);
+      state.products = cloneDeep(products);
+      this.setState(state);
+    } catch (e) {
+      notify("Ошибка получения списка услуг!");
+      console.log("handleSectionSelect::getSectionProductList", e);
+      this.setState(state);
+    };
   };
 
   /**
