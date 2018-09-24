@@ -1,11 +1,11 @@
-import React, { Component } from "react";
+import React, { Component, Fragment } from "react";
 import { cloneDeep } from "lodash";
 import { Spin } from "antd";
 import { defaultParams } from "./defaults.js";
 import { appInit, getAppParams, getUsers } from "./Actions";
 import Registry from "./Registry";
 import Settings from "./Settings";
-import { Aux, notify } from "./Utils";
+import { notify } from "./Utils";
 
 export default class App extends Component {
   state = {
@@ -45,14 +45,14 @@ export default class App extends Component {
       return <Spin />;
     }
     return (
-      <Aux>
+      <Fragment>
         {current === "registry" ? (
           <Registry params={params} switchMode={this.switchMode} />
         ) : null}
         {current === "settings" ? (
           <Settings params={params} switchMode={this.switchMode} />
         ) : null}
-      </Aux>
+      </Fragment>
     );
   }
 }

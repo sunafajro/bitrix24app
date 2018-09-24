@@ -95,11 +95,13 @@ export const getSectionProductList = (sectionId = "") => {
   });
 };
 
-/* Возвращает описание полей товара. */
+/**
+ * Возвращает описание полей товара.
+ */
 export const getProductFields = () => {
   return new Promise((resolve, reject) => {
     BX24.callMethod("crm.product.fields", {}, result => {
-      if (result.error()) reject();
+      if (result.error()) return reject();
       const rawProductFields = result.data();
       let specialistProp = "";
       let durationProp = "";
@@ -142,7 +144,7 @@ export const getSpecialistsByProduct = (durationProp, specialistProp, val) => {
   return new Promise((resolve, reject) => {
     /* Возвращает товар по идентификатору. */
     BX24.callMethod("crm.product.get", { ID: val }, result => {
-      if (result.error()) reject();
+      if (result.error()) return reject();
       const rawProductData = result.data();
       let duration = "";
       let specialists = [];
@@ -182,7 +184,7 @@ export const getSpecialistCalendarEvents = (id, startDate, endDate) => {
         to: endDate
       },
       result => {
-        if (result.error()) reject();
+        if (result.error()) return reject();
         const events = result.data();
         return resolve(Array.isArray(events) && events.length ? events : []);
       }
@@ -210,7 +212,7 @@ export const getSpecialistDeals = (id, startDate, endDate) => {
         }
       },
       result => {
-        if (result.error()) reject();
+        if (result.error()) return reject();
         deals = deals.concat(result.data());
         if (result.more()) {
           result.next();
@@ -220,4 +222,65 @@ export const getSpecialistDeals = (id, startDate, endDate) => {
       }
     );
   });
+};
+
+/**
+ * удаляет событие из календаря сотрудника
+ * @param {number} id
+ */
+export const deleteEventFromCalendar = id => {
+  return new Promise((resolve, reject) => {
+    BX24.callMethod("crm.activity.delete", { id }, result => {
+      if (result.error()) return reject();
+      return resolve();
+    });
+  });
+};
+
+/**
+ * возвращает звонков запланированный перед событием
+ * @param {number} id
+ */
+export const findPlannedCall = id => {
+  return new Promise((resolve, reject) => {
+    BX24.callMethod(
+      "crm.activity.list",
+      {
+        filter: {
+          "%SUBJECT": "[" + id + "]"
+        }
+      },
+      result => {
+        if (result.error()) return reject();
+        const data = result.data();
+        return resolve(Array.isArray(data) && data.length ? data : []);
+      }
+    );
+  });
+};
+
+export const  deletePlannedCall = id => {
+  return new Promise((resolve, reject) => {
+    BX24.callMethod(
+      "crm.activity.delete",
+      { id },
+      result => {
+        if (result.error()) return reject();
+        return resolve();
+      }
+    );
+  });
+}
+
+export default {
+  deleteEventFromCalendar,
+  deletePlannedCall,
+  findPlannedCall,
+  getPlacementData,
+  getProductFields,
+  getProductSectionList,
+  getSectionProductList,
+  getSpecialistsByProduct,
+  getSpecialistCalendarEvents,
+  getSpecialistDeals
 };

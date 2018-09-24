@@ -1,8 +1,7 @@
 /* global BX24 */
-import React from "react";
+import React, { Fragment } from "react";
 import Moment from "moment";
 import { Button, Icon, Popconfirm, Row, Tag } from "antd";
-import { Aux } from "../Utils";
 
 export const prepareTimeRange = () => {
   let timerange = [];
@@ -66,7 +65,7 @@ export const prepareCellEntries = (
     return Moment(cellDate).isSame(dateFrom) && Moment(cellDate).isSame(dateTo);
   });
   return (
-    <Aux>
+    <Fragment>
       <AddEventDiv date={Moment(cellDate)} handleShowModal={handleShowModal} />
       {dataEvents.length
         ? dataEvents.map(item => (
@@ -108,7 +107,7 @@ export const prepareCellEntries = (
             </div>
           ))
         : null}
-    </Aux>
+    </Fragment>
   );
 };
 

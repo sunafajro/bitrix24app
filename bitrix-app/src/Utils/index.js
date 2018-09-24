@@ -1,6 +1,5 @@
 import { notification } from "antd";
 
-export const Aux = ({ children }) => children;
 /**
  * Выводит уведомление
  * @param {string} text
